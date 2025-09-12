@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -26,21 +25,56 @@ const bodyAreas = [
 
 const AREA_VALUES = bodyAreas.map(a => a.value) as readonly string[]
 const toArea = (v: unknown) => {
-  const norm = String(v ?? "").trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_")
-  return AREA_VALUES.includes(norm as any) ? norm : ""
+  const norm = String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_")
+  return (AREA_VALUES as readonly string[]).includes(norm) ? norm : ""
+}
+
+type FieldErrors = {
+  title?: string
+  bodyArea?: string
+  durationMins?: string
 }
 
 export function SessionForm({ session, onSuccess, onCancel }: SessionFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  // отделни state-ове
+  // state
   const [title, setTitle] = useState("")
   const [bodyArea, setBodyArea] = useState<string>("")
   const [durationMins, setDurationMins] = useState<string>("")
   const [description, setDescription] = useState("")
 
-  // попълване/изчистване при смяна на id
+  // validation state
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [touched, setTouched] = useState({ title: false, bodyArea: false, durationMins: false })
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+
+  const validate = (vals: { title: string; bodyArea: string; durationMins: string }): FieldErrors => {
+    const e: FieldErrors = {}
+    const t = vals.title.trim()
+
+    if (!t) e.title = "Моля, въведете заглавие."
+    else if (t.length > 120) e.title = "Заглавието може да е най-много 120 символа."
+
+    if (!vals.bodyArea) e.bodyArea = "Изберете част от тялото."
+    else if (!AREA_VALUES.includes(vals.bodyArea as any)) e.bodyArea = "Невалиден избор."
+
+    const dStr = vals.durationMins.trim()
+    if (!dStr) e.durationMins = "Въведете продължителност."
+    else {
+      const n = Number.parseInt(dStr, 10)
+      if (!Number.isFinite(n) || n <= 0) e.durationMins = "Продължителността трябва да е положително цяло число."
+    }
+
+    return e
+  }
+
+  // populate/clear on session change
   useEffect(() => {
     if (session?.id) {
       setTitle(session.title ?? "")
@@ -53,30 +87,34 @@ export function SessionForm({ session, onSuccess, onCancel }: SessionFormProps) 
       setDurationMins("")
       setDescription("")
     }
+    setErrors({})
+    setTouched({ title: false, bodyArea: false, durationMins: false })
+    setSubmitAttempted(false)
   }, [session?.id])
-
-  // fallback за първия рендер (ако state още е празен)
-  const derivedArea = bodyArea || toArea((session as any)?.bodyArea)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitAttempted(true)
 
-    if (!title.trim() || !derivedArea || !durationMins) {
-      toast({ title: "Грешка", description: "Моля попълнете всички полета", variant: "destructive" })
+    const nextErrors = validate({ title, bodyArea, durationMins })
+    setErrors(nextErrors)
+
+    if (nextErrors.title || nextErrors.bodyArea || nextErrors.durationMins) {
+      toast({
+        title: "Има грешки във формата",
+        description: "Моля, коригирайте полетата, отбелязани в червено.",
+        variant: "destructive",
+      })
       return
     }
 
-    const duration = Number.parseInt(durationMins)
-    if (!Number.isFinite(duration) || duration <= 0) {
-      toast({ title: "Грешка", description: "Продължителността трябва да бъде положително число", variant: "destructive" })
-      return
-    }
+    const duration = Number.parseInt(durationMins, 10)
 
     try {
       setLoading(true)
       const data = {
         title: title.trim(),
-        bodyArea: derivedArea as any,
+        bodyArea: bodyArea as any,
         durationMins: duration,
         description: description.trim(),
       }
@@ -101,23 +139,50 @@ export function SessionForm({ session, onSuccess, onCancel }: SessionFormProps) 
     }
   }
 
+  const showTitleError = !!errors.title && (touched.title || submitAttempted)
+  const showAreaError = !!errors.bodyArea && (touched.bodyArea || submitAttempted)
+  const showDurationError = !!errors.durationMins && (touched.durationMins || submitAttempted)
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      {/* Title */}
       <div className="space-y-2">
-        <Label htmlFor="title">Заглавие *</Label>
+        <Label className="text-secondary" htmlFor="title">Заглавие *</Label>
         <Input
           id="title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          className={`text-secondary ${showTitleError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+          onChange={(e) => {
+            setTitle(e.target.value)
+            if (!touched.title) setTouched((t) => ({ ...t, title: true }))
+          }}
+          onBlur={() => setTouched((t) => ({ ...t, title: true }))}
           placeholder="Напр. Тренировка за гърди и трицепс"
-          required
+          aria-required="true"
+          aria-invalid={showTitleError}
+          aria-errormessage={showTitleError ? "title-error" : undefined}
         />
+        {showTitleError && <p id="title-error" className="text-sm text-destructive">{errors.title}</p>}
       </div>
 
+      {/* Body area */}
       <div className="space-y-2">
-        <Label htmlFor="bodyArea-trigger">Част от тялото *</Label>
-        <Select value={derivedArea || undefined} onValueChange={setBodyArea}>
-          <SelectTrigger id="bodyArea-trigger">
+        <Label className="text-secondary" htmlFor="bodyArea-trigger">Част от тялото *</Label>
+        <Select
+          key={bodyArea || "empty"}
+          value={bodyArea || undefined}
+          onValueChange={(v) => {
+            setBodyArea(v)
+            if (!touched.bodyArea) setTouched((t) => ({ ...t, bodyArea: true }))
+          }}
+        >
+          <SelectTrigger
+            className={`text-secondary ${showAreaError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+            id="bodyArea-trigger"
+            aria-required="true"
+            aria-invalid={showAreaError}
+            aria-errormessage={showAreaError ? "bodyArea-error" : undefined}
+          >
             <SelectValue placeholder="Изберете част от тялото" />
           </SelectTrigger>
           <SelectContent>
@@ -128,26 +193,39 @@ export function SessionForm({ session, onSuccess, onCancel }: SessionFormProps) 
             ))}
           </SelectContent>
         </Select>
+        {showAreaError && <p id="bodyArea-error" className="text-sm text-destructive">{errors.bodyArea}</p>}
       </div>
 
+      {/* Duration */}
       <div className="space-y-2">
-        <Label htmlFor="duration">Продължителност (минути) *</Label>
+        <Label className="text-secondary" htmlFor="duration">Продължителност (минути) *</Label>
         <Input
           id="duration"
           type="number"
+          inputMode="numeric"
+          className={`text-secondary ${showDurationError ? "border-destructive focus-visible:ring-destructive" : ""}`}
           min="1"
           value={durationMins}
-          onChange={(e) => setDurationMins(e.target.value)}
+          onChange={(e) => {
+            setDurationMins(e.target.value)
+            if (!touched.durationMins) setTouched((t) => ({ ...t, durationMins: true }))
+          }}
+          onBlur={() => setTouched((t) => ({ ...t, durationMins: true }))}
           placeholder="45"
-          required
+          aria-required="true"
+          aria-invalid={showDurationError}
+          aria-errormessage={showDurationError ? "duration-error" : undefined}
         />
+        {showDurationError && <p id="duration-error" className="text-sm text-destructive">{errors.durationMins}</p>}
       </div>
 
+      {/* Description (optional) */}
       <div className="space-y-2">
-        <Label htmlFor="description">Описание</Label>
+        <Label className="text-secondary" htmlFor="description">Описание</Label>
         <Textarea
           id="description"
           value={description}
+          className="text-secondary"
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Описание на тренировката..."
           rows={4}
@@ -158,7 +236,7 @@ export function SessionForm({ session, onSuccess, onCancel }: SessionFormProps) 
         <Button type="submit" disabled={loading}>
           {loading ? "Запазване..." : session?.id ? "Обнови" : "Създай"}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           Отказ
         </Button>
       </div>

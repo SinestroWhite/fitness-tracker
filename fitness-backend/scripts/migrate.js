@@ -20,7 +20,8 @@ async function runMigration() {
       "002_trainer_clients.sql",
       "003_workout_system.sql",
       "004_nutrition_system.sql",
-      "005_completed_workouts.sql"
+      "005_completed_workouts.sql",
+      "006_reviews_system.sql"
     ];
 
     // Read and execute the SQL file

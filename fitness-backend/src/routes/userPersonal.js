@@ -124,7 +124,7 @@ router.put(
       const userId = Number.parseInt(req.params.userId, 10)
       const { sex, height, goal, nutritionPlanId, workoutPlanId } = req.body
 
-      // Ensure the user exists (optional but mirrors original logic)
+        // Ensure the user exists (optional but mirrors original logic)
       const userCheck = await db.query(`SELECT id FROM users WHERE id = $1`, [userId])
       if (userCheck.rowCount === 0) {
         return res.status(404).json({ error: "User not found" })

@@ -1,7 +1,6 @@
-
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { Button } from "@/components/ui/button"
@@ -15,7 +14,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ExerciseForm } from "@/components/exercises/exercise-form"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,10 +35,18 @@ const muscleGroups = [
   { value: "full_body", label: "Цяло тяло" },
 ]
 
+// 🎯 Нормализираме евентуални snake_case ключове към нашите
+const normalizeExercise = (e: any): Exercise => ({
+  ...e,
+  name: e.name ?? e.title ?? "",
+  muscle: e.muscle ?? e.muscle_group ?? e.group ?? "",
+  image: e.image ?? e.image_url ?? e.thumbnail ?? "",
+  video: e.video ?? e.video_url ?? "",
+  description: e.description ?? e.notes ?? "", // ако имате поле за описание
+})
+
 const getYouTubeEmbed = (url: string) => {
-  // handles youtu.be and youtube.com variants
-  const yt =
-    /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_\-]{6,})/.exec(url)
+  const yt = /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_\-]{6,})/.exec(url)
   return yt ? `https://www.youtube.com/embed/${yt[1]}` : null
 }
 
@@ -49,21 +55,23 @@ const getVimeoEmbed = (url: string) => {
   return vm ? `https://player.vimeo.com/video/${vm[1]}` : null
 }
 
-const isLikelyVideoFile = (url: string) =>
-  /\.(mp4|webm|ogg|mov|m4v)$/i.test(url.split('?')[0] ?? '')
-
+const isLikelyVideoFile = (url: string) => /\.(mp4|webm|ogg|mov|m4v)$/i.test(url.split("?")[0] ?? "")
 
 export default function ExercisesPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [exercises, setExercises] = useState<Exercise[]>([])
+
+  const [rawExercises, setRawExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 🔍 Дебоунснато търсене + локален филтър по мускулна група
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selectedMuscle, setSelectedMuscle] = useState<string>("all")
+
   const [showForm, setShowForm] = useState(false)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
 
-  // AlertDialog state за изтриване
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [exerciseToDelete, setExerciseToDelete] = useState<Exercise | null>(null)
   const [videoExercise, setVideoExercise] = useState<Exercise | null>(null)
@@ -71,16 +79,22 @@ export default function ExercisesPage() {
 
   const canManageExercises = user?.role === "trainer" || user?.role === "admin"
 
+  // ⏱️ Debounce на търсенето
+  useEffect(() => {
+    const h = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300)
+    return () => clearTimeout(h)
+  }, [searchTerm])
+
   const fetchExercises = async () => {
     try {
       setLoading(true)
-      const params: ExerciseListParams = { pageSize: 100 }
-
-      if (searchTerm) params.search = searchTerm
+      const params: ExerciseListParams & Record<string, any> = { pageSize: 1000 }
+      // Оставяме филтъра по мускулна група към бекенда (ако е поддържан).
       if (selectedMuscle !== "all") params.muscle = selectedMuscle as any
 
       const response = await apiService.getExerciseList(params)
-      setExercises(response.data)
+      const list = Array.isArray(response.data) ? response.data : []
+      setRawExercises(list.map(normalizeExercise))
     } catch {
       toast({
         title: "Грешка",
@@ -92,10 +106,11 @@ export default function ExercisesPage() {
     }
   }
 
+  // Фечваме при mount и при смяна на мускулната група (търсенето е клиентско)
   useEffect(() => {
     fetchExercises()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, selectedMuscle])
+  }, [selectedMuscle])
 
   const confirmDelete = (exercise: Exercise) => {
     setExerciseToDelete(exercise)
@@ -107,10 +122,7 @@ export default function ExercisesPage() {
     try {
       setDeleting(true)
       await apiService.deleteExercise(exerciseToDelete.id)
-      toast({
-        title: "Успех",
-        description: "Упражнението е изтрито успешно",
-      })
+      toast({ title: "Успех", description: "Упражнението е изтрито успешно" })
       fetchExercises()
     } catch {
       toast({
@@ -131,9 +143,29 @@ export default function ExercisesPage() {
     fetchExercises()
   }
 
-  const getMuscleLabel = (muscle: string) => {
-    return muscleGroups.find((m) => m.value === muscle)?.label || muscle
-  }
+  const getMuscleLabel = (muscle: string) =>
+    muscleGroups.find((m) => m.value === muscle)?.label || muscle
+
+  // 🧠 Клиентско филтриране – работи независимо от бекенда
+  const filteredExercises = useMemo(() => {
+    let list = rawExercises
+
+    if (selectedMuscle !== "all") {
+      list = list.filter((e) => (e.muscle ?? "").toLowerCase() === selectedMuscle)
+    }
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
+      list = list.filter(
+        (e) =>
+          e.name?.toLowerCase?.().includes(q) ||
+          e.muscle?.toLowerCase?.().includes(q) ||
+          e.description?.toLowerCase?.().includes(q)
+      )
+    }
+
+    return list
+  }, [rawExercises, debouncedSearch, selectedMuscle])
 
   return (
     <ProtectedRoute>
@@ -141,26 +173,26 @@ export default function ExercisesPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Упражнения</h1>
-              <p className="text-muted-foreground">Библиотека с упражнения за тренировки</p>
+              <h1 className="text-3xl text-secondary font-bold">Упражнения</h1>
+              <p className="text-secondary">Упражнения за тренировки</p>
             </div>
             {canManageExercises && (
-              <Button onClick={() => setShowForm(true)}>
+              <Button variant="white" onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Добави упражнение
               </Button>
             )}
           </div>
 
-          {/* Filters */}
+          {/* Филтри */}
           <div className="flex gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute  left-3 top-1/2 -translate-y-1/2 text-secondary h-4 w-4" />
               <Input
                 placeholder="Търси упражнения..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-1 border-gray-500"
               />
             </div>
             <Select value={selectedMuscle} onValueChange={setSelectedMuscle}>
@@ -177,6 +209,11 @@ export default function ExercisesPage() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Опционално: брояч на резултата */}
+          {(debouncedSearch || selectedMuscle !== "all") && !loading && (
+            <p className="text-sm text-secondary">Намерени: {filteredExercises.length}</p>
+          )}
 
           {/* Exercise Grid */}
           {loading ? (
@@ -196,14 +233,14 @@ export default function ExercisesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {exercises.map((exercise) => (
+              {filteredExercises.map((exercise) => (
                 <Card key={exercise.id} className="group hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
                         <CardTitle className="text-lg">{exercise.name}</CardTitle>
                         <CardDescription>
-                          <Badge variant="secondary" className="mt-1">
+                          <Badge variant="secondary" className="mt-1 text-secondary bg-transparent border-1 border-gray-500">
                             {getMuscleLabel(exercise.muscle)}
                           </Badge>
                         </CardDescription>
@@ -221,7 +258,7 @@ export default function ExercisesPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => confirmDelete(exercise)}>
-                           <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       )}
@@ -240,24 +277,24 @@ export default function ExercisesPage() {
                               e.currentTarget.nextElementSibling?.classList.remove("hidden")
                             }}
                           />
-                          <div className="hidden flex items-center justify-center text-muted-foreground">
+                          <div className="hidden flex items-center justify-center text-primary">
                             <ImageIcon className="h-8 w-8" />
                           </div>
                         </div>
                       )}
-                      
+
                       {exercise.video && (
-  <Button
-    type="button"
-    variant="outline"
-    size="sm"
-    className="w-full bg-transparent"
-    onClick={() => setVideoExercise(exercise)}
-  >
-    <Play className="h-4 w-4 mr-2" />
-    Видео демонстрация
-  </Button>
-)}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full bg-transparent border-1 border-gray-500"
+                          onClick={() => setVideoExercise(exercise)}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Видео демонстрация
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -265,9 +302,9 @@ export default function ExercisesPage() {
             </div>
           )}
 
-          {!loading && exercises.length === 0 && (
+          {!loading && filteredExercises.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">Няма намерени упражнения</p>
+              <p className="text-secondary">Няма намерени упражнения</p>
             </div>
           )}
         </div>
@@ -284,24 +321,15 @@ export default function ExercisesPage() {
             <DialogHeader>
               <DialogTitle>{editingExercise ? "Редактиране на упражнение" : "Ново упражнение"}</DialogTitle>
             </DialogHeader>
-            {/* <ExerciseForm
+            <ExerciseForm
+              key={editingExercise?.id ?? "new"}   // ⬅️ принудителен ремоунт при смяна
               exercise={editingExercise}
               onSuccess={handleFormSuccess}
               onCancel={() => {
                 setShowForm(false)
                 setEditingExercise(null)
               }}
-            /> */}
-            <ExerciseForm
-  key={editingExercise?.id ?? "new"}   // ⬅️ forces a fresh mount when id changes
-  exercise={editingExercise}
-  onSuccess={handleFormSuccess}
-  onCancel={() => {
-    setShowForm(false)
-    setEditingExercise(null)
-  }}
-/>
-
+            />
           </DialogContent>
         </Dialog>
 
@@ -321,16 +349,12 @@ export default function ExercisesPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel
-                onClick={() => {
-                  setExerciseToDelete(null)
-                }}
-              >
+              <AlertDialogCancel onClick={() => setExerciseToDelete(null)}>
                 Отказ
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmDelete}
-                className="bg-destructive text-white hover:bg-destructive/90"
+                className="bg-destructive"
                 disabled={deleting}
               >
                 {deleting ? "Изтриване..." : "Изтрий"}
@@ -339,79 +363,68 @@ export default function ExercisesPage() {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Видео диалог */}
         <Dialog
-  open={!!videoExercise}
-  onOpenChange={(open) => {
-    if (!open) setVideoExercise(null)
-  }}
->
-  <DialogContent className="max-w-3xl">
-    <DialogHeader>
-      <DialogTitle>{videoExercise?.name ?? "Видео демонстрация"}</DialogTitle>
-    </DialogHeader>
+          open={!!videoExercise}
+          onOpenChange={(open) => {
+            if (!open) setVideoExercise(null)
+          }}
+        >
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{videoExercise?.name ?? "Видео демонстрация"}</DialogTitle>
+            </DialogHeader>
 
-    {videoExercise?.video && (() => {
-      const url = videoExercise.video
-      const yt = getYouTubeEmbed(url)
-      const vm = getVimeoEmbed(url)
+            {videoExercise?.video && (() => {
+              const url = videoExercise.video
+              const yt = getYouTubeEmbed(url)
+              const vm = getVimeoEmbed(url)
 
-      if (yt) {
-        return (
-          <div className="aspect-video w-full overflow-hidden rounded-lg">
-            <iframe
-              src={yt}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              title={`${videoExercise.name} video`}
-            />
-          </div>
-        )
-      }
+              if (yt) {
+                return (
+                  <div className="aspect-video w-full overflow-hidden rounded-lg">
+                    <iframe
+                      src={yt}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      title={`${videoExercise.name} video`}
+                    />
+                  </div>
+                )
+              }
 
-      if (vm) {
-        return (
-          <div className="aspect-video w-full overflow-hidden rounded-lg">
-            <iframe
-              src={vm}
-              className="w-full h-full"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-              title={`${videoExercise.name} video`}
-            />
-          </div>
-        )
-      }
+              if (vm) {
+                return (
+                  <div className="aspect-video w-full overflow-hidden rounded-lg">
+                    <iframe
+                      src={vm}
+                      className="w-full h-full"
+                      allow="autoplay; fullscreen; picture-in-picture"
+                      allowFullScreen
+                      title={`${videoExercise.name} video`}
+                    />
+                  </div>
+                )
+              }
 
-      if (isLikelyVideoFile(url)) {
-        return (
-          <video
-            controls
-            className="w-full rounded-lg"
-            src={url}
-            // If you serve from S3/Cloud, make sure CORS allows range requests
-          />
-        )
-      }
+              if (isLikelyVideoFile(url)) {
+                return (
+                  <video controls className="w-full rounded-lg" src={url} />
+                )
+              }
 
-      // Fallback: just link out if it’s some other host we don't embed
-      return (
-        <div className="text-sm">
-          Неуспешно вграждане на видеото. 
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="underline ml-1"
-          >
-            Отвори видеото в нов таб
-          </a>
-        </div>
-      )
-    })()}
-  </DialogContent>
-</Dialog>
-
+              return (
+                <div className="text-sm">
+                  Неуспешно вграждане на видеото.
+                  <a href={url} target="_blank" rel="noreferrer" className="underline ml-1">
+                    Отвори видеото в нов таб
+                  </a>
+                </div>
+              )
+            })()}
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </ProtectedRoute>
   )

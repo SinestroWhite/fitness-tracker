@@ -4,6 +4,8 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { AuthProvider } from "@/contexts/auth-context"
 import "./globals.css"
+import { Suspense } from "react"
+import RequireAuth from "@/components/requireAuth"
 
 export const metadata: Metadata = {
   title: "Фитнес Трекър",
@@ -28,7 +30,12 @@ html {
         `}</style>
       </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <Suspense>
+
+        <AuthProvider>
+          <RequireAuth>{children}</RequireAuth></AuthProvider>
+
+        </Suspense>
       </body>
     </html>
   )

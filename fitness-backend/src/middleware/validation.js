@@ -38,7 +38,7 @@ const userPersonalValidation = [
   body("sex").optional().isIn(["male", "female"]),
   body("height").optional().isFloat({ min: 0, max: 300 }),
   body("goal").optional().isIn(["lose", "gain", "keep"]),
-  body("nutritionPlanId").optional().isInt({ min: 1 }),
+  body("nutritionPlanId").optional({ nullable: true }).isInt({ min: 1 }),
   body("workoutPlanId").optional({ nullable: true }).isInt({ min: 1 }),
   handleValidationErrors,
 ]

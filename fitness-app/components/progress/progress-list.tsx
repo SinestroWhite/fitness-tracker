@@ -70,7 +70,7 @@ export function ProgressList({ data, onUpdate, onEdit }: ProgressListProps) {
           <CardDescription>Вашите записи на прогреса</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-secondary">
             <p>Няма записи на прогрес</p>
             <p className="text-sm mt-1">Добавете първия си запис за да започнете проследяването</p>
           </div>
@@ -84,17 +84,17 @@ export function ProgressList({ data, onUpdate, onEdit }: ProgressListProps) {
     <Card>
       <CardHeader>
         <CardTitle>История на прогреса</CardTitle>
-        <CardDescription>Вашите записи на прогреса ({data.length} общо)</CardDescription>
+        <CardDescription >Вашите записи на прогреса ({data.length} общо)</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {data.map((entry) => (
-            <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg">
+            <div key={entry.id} className="flex items-center justify-between p-4 border-1 border-gray-500 rounded-lg">
               <div className="flex-1">
                 <div className="flex items-center space-x-4">
                   <div>
                     <p className="font-medium">{entry.weightKg} кг</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-secondary">
                       {new Date(entry.createdAt).toLocaleDateString("bg-BG", {
                         year: "numeric",
                         month: "long",
@@ -104,28 +104,27 @@ export function ProgressList({ data, onUpdate, onEdit }: ProgressListProps) {
                       })}
                     </p>
                   </div>
-                  {entry.bodyFat && <Badge variant="secondary">{entry.bodyFat}% мастна тъкан</Badge>}
                   {entry.images && entry.images.length > 0 && (
                        <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleViewImages(entry)}
-                        className="h-auto cursor-pointer px-2 py-1"
+                        className="h-auto cursor-pointer px-2 py-1 bg-transparent border-1 border-gray-500 text-secondary"
                       >
-                      <ImageIcon className="w-3 h-3 mr-1" />
+                      <ImageIcon className="w-3 h-3 mr-1 text-secondary" />
                       {entry.images.length} снимки
                       </Button>
                   )}
                 </div>
               </div>
               <div className="flex space-x-2">
-                <Button className="cursor-pointer" variant="outline" size="sm" onClick={() => onEdit(entry)}>
-                  <Edit className="w-4 h-4" />
+                <Button className="cursor-pointer bg-transparent border-1 border-gray-500" variant="outline" size="sm" onClick={() => onEdit(entry)}>
+                  <Edit className="w-4 h-4 text-secondary" />
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button className="cursor-pointer" variant="outline" size="sm" disabled={deletingId === entry.id}>
-                      <Trash2 className="w-4 h-4" />
+                    <Button className="cursor-pointer bg-transparent border-1 border-gray-500" variant="outline" size="sm" disabled={deletingId === entry.id}>
+                      <Trash2 className="w-4 h-4 text-secondary" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -139,7 +138,7 @@ export function ProgressList({ data, onUpdate, onEdit }: ProgressListProps) {
                       <AlertDialogCancel>Отказ</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => handleDelete(entry.id)}
-                        className="bg-destructive text-white  hover:bg-destructive/90"
+                        className="bg-destructive text-secondary  hover:bg-destructive/90"
                       >
                         Изтрий
                       </AlertDialogAction>

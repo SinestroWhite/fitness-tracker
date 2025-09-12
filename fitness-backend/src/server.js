@@ -19,6 +19,7 @@ const nutritionPlans = require("./routes/nutritionPlans")
 const nutritionPlanMeal = require("./routes/nutritionPlanMeals")
 const meals = require("./routes/meals")
 const completedWorkouts = require("./routes/completedWorkouts")
+const reviews = require("./routes/reviews")
 const { errorHandler } = require("./middleware/errorHandler")
 
 const app = express()
@@ -62,6 +63,7 @@ app.use("/nutrition-plans", nutritionPlans)
 app.use("/nutrition-plan-meals", nutritionPlanMeal)
 app.use("/meals", meals)
 app.use("/completed-workout", completedWorkouts)
+app.use("/reviews", reviews);
 
 // Health check
 app.get("/health", (req, res) => {

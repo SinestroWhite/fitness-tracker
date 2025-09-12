@@ -12,7 +12,7 @@ const SORT_FIELDS = {
   email: "email",
   name: "name",
   role: "role",
-  createdAt: `"createdAt"`, // quoted to keep camelCase column
+  created_at: `"created_at"`, // FIX: правилно име на колоната
 };
 const SORT_ORDERS = { asc: "ASC", desc: "DESC" };
 
@@ -20,21 +20,18 @@ const SORT_ORDERS = { asc: "ASC", desc: "DESC" };
 router.get("/me", authenticateToken, async (req, res, next) => {
   const db = getDb();
   try {
-
     const { rows } = await db.query(
-      `SELECT id, email, name, role, "created_at" FROM users WHERE id = $1`,
+      `SELECT id, email, name, role, status, blocked_until, blocked_reason, "created_at"
+       FROM users WHERE id = $1`,
       [req.user.id],
     );
-    
     const user = rows[0];
-    
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ user });
   } catch (err) {
     next(err);
   }
 });
-
 
 // PUT /users/me
 router.put("/me", authenticateToken, updateUserValidation, async (req, res, next) => {
@@ -65,7 +62,8 @@ router.put("/me", authenticateToken, updateUserValidation, async (req, res, next
     await db.query(updateSql, params);
 
     const { rows } = await db.query(
-      `SELECT id, email, name, role, "created_at" FROM users WHERE id = $1`,
+      `SELECT id, email, name, role, status, blocked_until, blocked_reason, "created_at"
+       FROM users WHERE id = $1`,
       [req.user.id],
     );
     res.json({ user: rows[0] });
@@ -83,7 +81,7 @@ router.get("/", authenticateToken, requireRole(["admin"]), paginationValidation,
   try {
     const page = Number.parseInt(req.query.page ?? 1, 10);
     const pageSize = Number.parseInt(req.query.pageSize ?? 20, 10);
-    const { role, email } = req.query;
+    const { role, email, status } = req.query;
     const sortRaw = (req.query.sort ?? "created_at:desc").toString();
 
     // Build filters
@@ -98,6 +96,10 @@ router.get("/", authenticateToken, requireRole(["admin"]), paginationValidation,
     if (email) {
       where.push(`email ILIKE $${p++}`);
       params.push(`%${email}%`);
+    }
+    if (status) {
+      where.push(`status = $${p++}`);
+      params.push(status);
     }
 
     const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -117,7 +119,7 @@ router.get("/", authenticateToken, requireRole(["admin"]), paginationValidation,
 
     // Get paged users
     const usersSql = `
-      SELECT id, email, name, role, "created_at"
+      SELECT id, email, name, role, status, blocked_until, blocked_reason, "created_at"
       FROM users
       ${whereClause}
       ${orderClause}
@@ -139,7 +141,7 @@ router.get("/", authenticateToken, requireRole(["admin"]), paginationValidation,
   }
 });
 
-// GET /users/trainers
+// GET /users/trainers (скрива блокираните)
 router.get("/trainers", authenticateToken, paginationValidation, async (req, res, next) => {
   const db = getDb();
   try {
@@ -156,7 +158,7 @@ router.get("/trainers", authenticateToken, paginationValidation, async (req, res
       name: "u.name",
       email: "u.email",
       created_at: "u.created_at",
-      client_count: "client_count", // aggregate alias
+      client_count: "client_count",
     };
     const sortField = ALLOWED_SORT_FIELDS[rawField] || ALLOWED_SORT_FIELDS.name;
     const sortOrder = rawDir.toLowerCase() === "desc" ? "DESC" : "ASC";
@@ -164,7 +166,11 @@ router.get("/trainers", authenticateToken, paginationValidation, async (req, res
     // filters
     const params = [];
     let p = 1;
-    let where = `WHERE u.role = 'trainer'`;
+    let where = `
+      WHERE u.role = 'trainer'
+        AND u.status = 'active'
+        AND (u.blocked_until IS NULL OR u.blocked_until <= NOW())
+    `;
 
     if (search) {
       params.push(`%${search}%`, `%${search}%`);
@@ -215,7 +221,8 @@ router.get("/:id", authenticateToken, requireOwnershipOrRole(["admin"]), async (
   try {
     const userId = Number.parseInt(req.params.id, 10);
     const { rows } = await db.query(
-      `SELECT id, email, name, role, "created_at" FROM users WHERE id = $1`,
+      `SELECT id, email, name, role, status, blocked_until, blocked_reason, "created_at"
+       FROM users WHERE id = $1`,
       [userId],
     );
     const user = rows[0];
@@ -232,14 +239,13 @@ router.post("/", authenticateToken, requireRole(["admin"]), updateUserValidation
   try {
     const { email, name, role = "user" } = req.body;
 
-    // Generate temporary password
     const tempPassword = Math.random().toString(36).slice(-8);
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
     const insertSql = `
       INSERT INTO users (email, "password_hash", name, role)
       VALUES ($1, $2, $3, $4)
-      RETURNING id, email, name, role, "created_at"
+      RETURNING id, email, name, role, status, blocked_until, blocked_reason, "created_at"
     `;
     const values = [email, passwordHash, name, role];
 
@@ -248,11 +254,10 @@ router.post("/", authenticateToken, requireRole(["admin"]), updateUserValidation
 
     res.status(201).json({
       user,
-      tempPassword, // In production, send this via email
+      tempPassword, // В продукция – прати по имейл
     });
   } catch (err) {
     if (err.code === "23505") {
-      // unique_violation
       return res.status(409).json({ error: "Имейл адресът вече съществува" });
     }
     next(err);
@@ -301,7 +306,8 @@ router.put("/:id", authenticateToken, requireOwnershipOrRole(["admin"]), updateU
     }
 
     const { rows } = await db.query(
-      `SELECT id, email, name, role, "created_at" FROM users WHERE id = $1`,
+      `SELECT id, email, name, role, status, blocked_until, blocked_reason, "created_at"
+       FROM users WHERE id = $1`,
       [userId],
     );
     res.json({ user: rows[0] });
@@ -329,6 +335,96 @@ router.delete("/:id", authenticateToken, requireRole(["admin"]), async (req, res
 });
 
 
+// POST /users/:id/block
+// body: { reason?: string, until?: string (ISO дата/час) }
+router.post("/:id/block", authenticateToken, requireRole(["admin"]), async (req, res, next) => {
+  const db = getDb();
+  try {
+    const targetId = Number.parseInt(req.params.id, 10);
+    const { reason, until } = req.body || {};
+
+    if (Number.isNaN(targetId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+    if (req.user.id === targetId) {
+      return res.status(400).json({ error: "Админ не може да блокира себе си" });
+    }
+
+    // Вземаме таргета и проверяваме, че не е админ
+    const { rows: targetRows } = await db.query(
+      `SELECT id, role FROM users WHERE id = $1`,
+      [targetId]
+    );
+    const target = targetRows[0];
+    if (!target) return res.status(404).json({ error: "User not found" });
+    if (target.role === "admin") {
+      return res.status(403).json({ error: "Не може да блокираш администратор" });
+    }
+
+    let untilTs = null;
+    if (until) {
+      const d = new Date(until);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ error: "Невалидна дата за until" });
+      }
+      untilTs = d.toISOString();
+    }
+
+    // Ако има until -> временно блокиране (status остава 'active', но blocked_until действа)
+    // Ако няма -> постоянен блок (status='blocked', blocked_until NULL)
+    const updateSql = `
+      UPDATE users
+      SET
+        status = CASE WHEN $2::timestamp IS NULL THEN 'blocked' ELSE 'active' END,
+        blocked_until = $2::timestamp,
+        blocked_reason = $3,
+        blocked_by = $4,
+        blocked_at = NOW()
+      WHERE id = $1
+      RETURNING id, email, name, role, status, blocked_until, blocked_reason, "created_at"
+    `;
+    const { rows } = await db.query(updateSql, [targetId, untilTs, reason || null, req.user.id]);
+
+    // чистим всички refresh токени на потребителя
+    await db.query(`DELETE FROM refresh_tokens WHERE user_id = $1`, [targetId]);
+
+    return res.json({ message: "User blocked", user: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /users/:id/unblock
+router.post("/:id/unblock", authenticateToken, requireRole(["admin"]), async (req, res, next) => {
+  const db = getDb();
+  try {
+    const targetId = Number.parseInt(req.params.id, 10);
+
+    if (Number.isNaN(targetId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const updateSql = `
+      UPDATE users
+      SET status = 'active',
+          blocked_until = NULL,
+          blocked_reason = NULL,
+          blocked_by = NULL,
+          blocked_at = NULL
+      WHERE id = $1
+      RETURNING id, email, name, role, status, blocked_until, blocked_reason, "created_at"
+    `;
+    const { rows } = await db.query(updateSql, [targetId]);
+    if (!rows[0]) return res.status(404).json({ error: "User not found" });
+
+    return res.json({ message: "User unblocked", user: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** ----------------------------------------------------------- **/
+
 // PUT /users/me/trainer (authenticated users only)
 router.put("/me/trainer", authenticateToken, async (req, res) => {
   const { trainerId } = req.body;
@@ -341,13 +437,16 @@ router.put("/me/trainer", authenticateToken, async (req, res) => {
     const client = await db.connect();
     try {
       if (trainerId) {
-        // Validate trainer exists & is a trainer
+        // Validate trainer exists & is a trainer and not blocked
         const { rows } = await client.query(
-          "SELECT id FROM users WHERE id = $1 AND role = 'trainer'",
+          `SELECT id FROM users
+           WHERE id = $1 AND role = 'trainer'
+             AND status = 'active'
+             AND (blocked_until IS NULL OR blocked_until <= NOW())`,
           [trainerId],
         );
         if (rows.length === 0) {
-          return res.status(404).json({ error: "Trainer not found" });
+          return res.status(404).json({ error: "Trainer not found or not available" });
         }
 
         await client.query("UPDATE users SET trainer_id = $1 WHERE id = $2", [
@@ -357,7 +456,6 @@ router.put("/me/trainer", authenticateToken, async (req, res) => {
 
         res.json({ message: "Trainer assigned successfully", trainerId });
       } else {
-        // Unassign trainer
         await client.query("UPDATE users SET trainer_id = NULL WHERE id = $1", [req.user.id]);
         res.json({ message: "Trainer unassigned successfully" });
       }
@@ -395,7 +493,6 @@ router.get("/me/trainer", authenticateToken, async (req, res) => {
   }
 });
 
-
 router.get(
   "/trainer/clients",
   authenticateToken,
@@ -406,20 +503,17 @@ router.get(
     try {
       const { page = "1", pageSize = "20", sort = "name:asc" } = req.query;
 
-      // Валидации/нормализация
       const pageNum = Math.max(parseInt(page, 10) || 1, 1);
       const sizeNum = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 100);
 
       const [sortFieldRaw = "name", sortOrderRaw = "asc"] = String(sort).split(":");
 
-      // Разрешени колони за ORDER BY (предпазва от SQL injection)
       const SORTABLE_FIELDS = new Set(["name", "email", "created_at"]);
       const sortField = SORTABLE_FIELDS.has(sortFieldRaw) ? sortFieldRaw : "name";
       const sortOrder = sortOrderRaw.toLowerCase() === "desc" ? "DESC" : "ASC";
 
       const offset = (pageNum - 1) * sizeNum;
 
-      // 1) Общо на клиентите
       const countSql = `
         SELECT COUNT(*)::int AS total
         FROM users
@@ -428,7 +522,6 @@ router.get(
       const { rows: countRows } = await db.query(countSql, [req.user.id]);
       const total = countRows?.[0]?.total ?? 0;
 
-      // 2) Данните (с whitelisted ORDER BY)
       const dataSql = `
         SELECT id, email, name, role, created_at
         FROM users
@@ -448,7 +541,7 @@ router.get(
         },
       });
     } catch (err) {
-      next(err); // или res.status(500).json({ error: "Server error" })
+      next(err);
     }
   }
 );
@@ -561,145 +654,5 @@ router.get(
   }
 );
 
-
-
-// router.get("/trainer/clients", authenticateToken, requireRole(["trainer"]), paginationValidation, (req, res) => {
-//   const db = getDb()
-//   const { page = 1, pageSize = 20, sort = "name:asc" } = req.query
-
-//   // Build sort
-//   const [sortField, sortOrder] = sort.split(":")
-//   const orderClause = `ORDER BY ${sortField} ${sortOrder.toUpperCase()}`
-
-//   // Calculate offset
-//   const offset = (page - 1) * pageSize
-
-//   // Get total count of assigned clients
-//   db.get(
-//     "SELECT COUNT(*) as total FROM users WHERE trainer_id = ? AND role = 'user'",
-//     [req.user.id],
-//     (err, countResult) => {
-//       if (err) throw err
-
-//       // Get assigned clients
-//       db.all(
-//         `SELECT id, email, name, role, created_at FROM users WHERE trainer_id = ? AND role = 'user' ${orderClause} LIMIT ? OFFSET ?`,
-//         [req.user.id, pageSize, offset],
-//         (err, clients) => {
-//           if (err) throw err
-
-//           res.json({
-//             clients,
-//             pagination: {
-//               page,
-//               pageSize,
-//               total: countResult.total,
-//               totalPages: Math.ceil(countResult.total / pageSize),
-//             },
-//           })
-//         },
-//       )
-//     },
-//   )
-// })
-
-// GET /users/trainer/available (trainer only)
-// router.get("/trainer/available", authenticateToken, requireRole(["trainer"]), paginationValidation, (req, res) => {
-//   const db = getDb()
-//   const { page = 1, pageSize = 20, search, sort = "name:asc" } = req.query
-
-//   let whereClause = "WHERE role = 'user'"
-//   const params = []
-
-//   // Add search filter
-//   if (search) {
-//     whereClause += " AND (name LIKE ? OR email LIKE ?)"
-//     params.push(`%${search}%`, `%${search}%`)
-//   }
-
-//   // Build sort
-//   const [sortField, sortOrder] = sort.split(":")
-//   const orderClause = `ORDER BY ${sortField} ${sortOrder.toUpperCase()}`
-
-//   // Calculate offset
-//   const offset = (page - 1) * pageSize
-
-//   // Get total count
-//   db.get(`SELECT COUNT(*) as total FROM users ${whereClause}`, params, (err, countResult) => {
-//     if (err) throw err
-
-//     // Get available users
-//     db.all(
-//       `SELECT id, email, name, trainer_id, created_at FROM users ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
-//       [...params, pageSize, offset],
-//       (err, users) => {
-//         if (err) throw err
-
-//         res.json({
-//           users,
-//           pagination: {
-//             page,
-//             pageSize,
-//             total: countResult.total,
-//             totalPages: Math.ceil(countResult.total / pageSize),
-//           },
-//         })
-//       },
-//     )
-//   })
-// })
-
-// // PUT /users/:id/trainer (trainer and admin only)
-// router.put("/:id/trainer", authenticateToken, requireRole(["trainer", "admin"]), (req, res) => {
-//   const userId = Number.parseInt(req.params.id)
-//   const { assign } = req.body // true to assign, false to unassign
-//   const db = getDb()
-
-//   // Check if target user exists and is a regular user
-//   db.get("SELECT id, role, trainer_id FROM users WHERE id = ?", [userId], (err, user) => {
-//     if (err) throw err
-
-//     if (!user) {
-//       return res.status(404).json({ error: "User not found" })
-//     }
-
-//     if (user.role !== "user") {
-//       return res.status(400).json({ error: "Can only assign regular users as clients" })
-//     }
-
-//     // For trainers, they can only assign clients to themselves or unassign their own clients
-//     if (req.user.role === "trainer") {
-//       if (assign && user.trainer_id && user.trainer_id !== req.user.id) {
-//         return res.status(403).json({ error: "User is already assigned to another trainer" })
-//       }
-//       if (!assign && user.trainer_id !== req.user.id) {
-//         return res.status(403).json({ error: "Can only unassign your own clients" })
-//       }
-//     }
-
-//     const newTrainerId = assign ? req.user.id : null
-
-//     db.run("UPDATE users SET trainer_id = ? WHERE id = ?", [newTrainerId, userId], function (err) {
-//       if (err) throw err
-
-//       if (this.changes === 0) {
-//         return res.status(404).json({ error: "User not found" })
-//       }
-
-//       // Return updated user
-//       db.get(
-//         "SELECT id, email, name, role, trainer_id, created_at FROM users WHERE id = ?",
-//         [userId],
-//         (err, updatedUser) => {
-//           if (err) throw err
-//           res.json({
-//             user: updatedUser,
-//             message: assign ? "Client assigned successfully" : "Client unassigned successfully",
-//           })
-//         },
-//       )
-//     })
-//   })
-// })
 
 module.exports = router;

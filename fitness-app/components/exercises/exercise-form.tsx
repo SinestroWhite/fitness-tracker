@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -40,6 +39,8 @@ const getVimeoEmbed = (url: string) => {
   return m ? `https://player.vimeo.com/video/${m[1]}` : null
 }
 
+type FieldErrors = { name?: string; muscle?: string }
+
 export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -47,6 +48,25 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
   // текстови полета
   const [name, setName] = useState("")
   const [muscle, setMuscle] = useState("")
+
+  // валидация
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [touched, setTouched] = useState({ name: false, muscle: false })
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+
+  const validate = (vals: { name: string; muscle: string }): FieldErrors => {
+    const e: FieldErrors = {}
+    const nameTrim = vals.name.trim()
+    const isValidMuscle = muscleGroups.some((g) => g.value === vals.muscle)
+
+    if (!nameTrim) e.name = "Моля, въведете име."
+    else if (nameTrim.length > 100) e.name = "Името може да е най-много 100 символа."
+
+    if (!vals.muscle) e.muscle = "Изберете мускулна група."
+    else if (!isValidMuscle) e.muscle = "Невалидна мускулна група."
+
+    return e
+  }
 
   // файлове
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -64,20 +84,18 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
     if (exercise) {
       setName(exercise.name ?? "")
       setMuscle(exercise.muscle ?? "")
-      setRemoveImage(false)
-      setRemoveVideo(false)
-      setImageFile(null)
-      setVideoFile(null)
-      setVideoUrl("")
     } else {
       setName("")
       setMuscle("")
-      setRemoveImage(false)
-      setRemoveVideo(false)
-      setImageFile(null)
-      setVideoFile(null)
-      setVideoUrl("")
     }
+    setRemoveImage(false)
+    setRemoveVideo(false)
+    setImageFile(null)
+    setVideoFile(null)
+    setVideoUrl("")
+    setErrors({})
+    setTouched({ name: false, muscle: false })
+    setSubmitAttempted(false)
   }, [exercise])
 
   // наличности от сървъра
@@ -112,7 +130,7 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
     setVideoObjectUrl("")
   }, [videoFile])
 
-  // източник за преглед (без зависимост от hasExistingVideo за TDZ устойчивост)
+  // източник за преглед
   const videoPreviewSrc = useMemo(() => {
     if (removeVideo) return ""
     if (videoFile && videoObjectUrl) return videoObjectUrl
@@ -126,13 +144,20 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
     setVideoLoadError(false)
   }, [videoPreviewSrc])
 
+  const showNameError = (!!errors.name) && (touched.name || submitAttempted)
+  const showMuscleError = (!!errors.muscle) && (touched.muscle || submitAttempted)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitAttempted(true)
 
-    if (!name.trim() || !muscle) {
+    const nextErrors = validate({ name, muscle })
+    setErrors(nextErrors)
+    if (nextErrors.name || nextErrors.muscle) {
+      // Обобщаващ toast
       toast({
-        title: "Грешка",
-        description: "Моля попълнете всички задължителни полета",
+        title: "Има грешки във формата",
+        description: "Моля, коригирайте полетата, отбелязани в червено.",
         variant: "destructive",
       })
       return
@@ -207,24 +232,46 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4 ">
       {/* Name */}
       <div className="space-y-2">
-        <Label htmlFor="name">Име на упражнението *</Label>
+        <Label className="text-secondary" htmlFor="name">Име на упражнението *</Label>
         <Input
           id="name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          className={`text-secondary ${showNameError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+          onChange={(e) => {
+            setName(e.target.value)
+            if (!touched.name) setTouched((t) => ({ ...t, name: true }))
+          }}
+          onBlur={() => setTouched((t) => ({ ...t, name: true }))}
           placeholder="Напр. Лицеви опори"
           required
+          aria-invalid={showNameError}
+          aria-errormessage={showNameError ? "name-error" : undefined}
         />
+        {showNameError && (
+          <p id="name-error" className="text-sm text-destructive">{errors.name}</p>
+        )}
       </div>
 
       {/* Muscle */}
       <div className="space-y-2">
-        <Label htmlFor="muscle">Мускулна група *</Label>
-        <Select key={muscle || "empty"} value={muscle} onValueChange={setMuscle}>
-          <SelectTrigger>
+        <Label className="text-secondary" htmlFor="muscle">Мускулна група *</Label>
+        <Select
+          key={muscle || "empty"}
+          value={muscle}
+          onValueChange={(v) => {
+            setMuscle(v)
+            if (!touched.muscle) setTouched((t) => ({ ...t, muscle: true }))
+          }}
+        >
+          <SelectTrigger
+            id="muscle"
+            className={showMuscleError ? "border-destructive focus-visible:ring-destructive" : ""}
+            aria-invalid={showMuscleError}
+            aria-errormessage={showMuscleError ? "muscle-error" : undefined}
+          >
             <SelectValue placeholder="Изберете мускулна група" />
           </SelectTrigger>
           <SelectContent>
@@ -235,13 +282,16 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
             ))}
           </SelectContent>
         </Select>
+        {showMuscleError && (
+          <p id="muscle-error" className="text-sm text-destructive">{errors.muscle}</p>
+        )}
       </div>
 
       <Separator />
 
       {/* Image section */}
       <div className="space-y-2">
-        <Label>Изображение</Label>
+        <Label className="text-secondary">Изображение</Label>
 
         {/* Преглед (скрит ако е маркирано за премахване) */}
         {imagePreview && (
@@ -256,6 +306,7 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
             id="image"
             type="file"
             accept="image/*"
+            className="text-secondary"
             onChange={(e) => {
               setRemoveImage(false)
               setImageFile(e.target.files?.[0] || null)
@@ -293,7 +344,7 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
 
       {/* Video section */}
       <div className="space-y-2">
-        <Label>Видео</Label>
+        <Label className="text-secondary">Видео</Label>
 
         {/* Преглед (скрит ако е маркирано за премахване) */}
         {videoPreviewSrc && (
@@ -350,6 +401,7 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
             id="video"
             type="file"
             accept="video/*"
+            className="text-secondary"
             disabled={removeVideo}
             onChange={(e) => {
               setRemoveVideo(false)
@@ -360,7 +412,6 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
           {videoFile && (
             <p className="text-sm text-green-600">Избрано видео: {videoFile.name}</p>
           )}
-
 
           {/* Remove existing (edit mode) -> бутон */}
           {exercise && hasExistingVideo && !videoFile && (
@@ -389,7 +440,6 @@ export function ExerciseForm({ exercise, onSuccess, onCancel }: ExerciseFormProp
               Текущото видео ще бъде премахнато при запазване.
             </p>
           )}
-
         </div>
       </div>
 

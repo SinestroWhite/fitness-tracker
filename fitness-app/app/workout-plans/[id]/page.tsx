@@ -180,13 +180,13 @@ export default function WorkoutPlanDetailPage() {
   const getGoalColor = (goal: string) => {
     switch (goal) {
       case "lose":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-red-600 text-red-50"
       case "gain":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-green-600 text-green-50"
       case "maintain":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-blue-600 text-blue-50"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "bg-gray-600 text-gray-50"
     }
   }
 
@@ -211,8 +211,8 @@ export default function WorkoutPlanDetailPage() {
       <DashboardLayout>
         <div className="space-y-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/workout-plans")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+            <Button variant="ghost" className="text-secondary" size="sm" onClick={() => router.push("/workout-plans")}>
+              <ArrowLeft className="h-4 w-4 mr-2 text-secondary" />
               Назад към плановете
             </Button>
           </div>
@@ -228,7 +228,7 @@ export default function WorkoutPlanDetailPage() {
                       <Target className="h-3 w-3 mr-1" />
                       {getGoalLabel(workoutPlan.goal as string)}
                     </Badge>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-secondary">
                       Създаден на {formatBgDate((workoutPlan as any).createdAt ?? (workoutPlan as any).created_at)}
                     </div>
                   </CardDescription>
@@ -246,7 +246,7 @@ export default function WorkoutPlanDetailPage() {
                   <CardDescription>Сесии включени в този план с разписание</CardDescription>
                 </div>
                 {canManagePlans && (
-                  <Button onClick={() => setShowSessionForm(true)}>
+                  <Button variant="white" onClick={() => setShowSessionForm(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Добави план
                   </Button>
@@ -256,7 +256,7 @@ export default function WorkoutPlanDetailPage() {
             <CardContent>
               {sessions.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">Няма добавени сесии в този план</p>
+                  <p className="text-secondary">Няма добавени сесии в този план</p>
                   {canManagePlans && (
                     <Button className="mt-4" onClick={() => setShowSessionForm(true)}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -270,14 +270,14 @@ export default function WorkoutPlanDetailPage() {
                     const days = Array.isArray(planSession.schedule) ? planSession.schedule : []
                     return (
                       <div key={planSession.id}>
-                        <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center justify-between p-4 border-1 border-gray-500 rounded-lg">
                           <div className="flex items-center gap-4">
-                            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                            <div className="w-8 h-8 bg-secondary text-primary rounded-full flex items-center justify-center text-sm font-medium">
                               {index + 1}
                             </div>
                             <div>
                               <h4 className="font-medium">{planSession.title}</h4>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-4 text-sm text-secondary">
                                 {/* <div className="flex items-center">
                                   <Clock className="h-3 w-3 mr-1" />
                                   {planSession.durationMins} мин
@@ -296,6 +296,7 @@ export default function WorkoutPlanDetailPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                className="border-1 border-gray-500"
                                 onClick={() => {
                                   setEditingSession(planSession)
                                   setShowSessionForm(true)
@@ -310,7 +311,7 @@ export default function WorkoutPlanDetailPage() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="cursor-pointer"
+                                    className="border-1 border-gray-500"
                                     disabled={deletingId === planSession.id}
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -329,7 +330,7 @@ export default function WorkoutPlanDetailPage() {
                                     <AlertDialogCancel>Отказ</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDeleteSession(planSession.pivot_id)}
-                                      className="bg-destructive text-white hover:bg-destructive/90"
+                                      className="bg-destructive text-secondary hover:bg-destructive/90"
                                       disabled={deletingId === planSession.pivot_id}
                                     >
                                       {deletingId === planSession.id ? "Изтриване..." : "Изтрий"}

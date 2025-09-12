@@ -26,6 +26,25 @@ import { useToast } from "@/hooks/use-toast"
 import { SessionExerciseForm } from "@/components/sessions/session-exercise-form"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
+// ⬇️ Добави това помощно:
+const sortByPivotId = (list: any[] = []) => {
+  return [...list].sort((a, b) => {
+    const pa = Number(getPivotId(a))
+    const pb = Number(getPivotId(b))
+
+    // ако и двете са валидни числа → числова сортировка
+    if (Number.isFinite(pa) && Number.isFinite(pb)) return pa - pb
+    // ако само едното е число → числата да са първи
+    if (Number.isFinite(pa)) return -1
+    if (Number.isFinite(pb)) return 1
+    // иначе лексикографски с numeric за случаи като "10" > "2"
+    return String(getPivotId(a) ?? "").localeCompare(String(getPivotId(b) ?? ""), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    })
+  })
+}
+
 const bodyAreas = [
   { value: "full_body", label: "Цяло тяло" },
   { value: "upper_body", label: "Горна част" },
@@ -110,7 +129,7 @@ export default function SessionDetailPage() {
         apiService.getSessionExercises(sessionId),
       ])
       setSession(normalizeSession(sessionData))
-      setExercises(exercisesData ?? [])
+      setExercises(sortByPivotId(exercisesData ?? []));
     } catch (error) {
       toast({
         title: "Грешка",
@@ -177,8 +196,8 @@ export default function SessionDetailPage() {
       <DashboardLayout>
         <div className="space-y-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/sessions")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+            <Button className="text-secondary" variant="ghost" size="sm" onClick={() => router.push("/sessions")}>
+              <ArrowLeft className="h-4 w-4 mr-2 text-secondary" />
               Назад към сесиите
             </Button>
           </div>
@@ -190,8 +209,8 @@ export default function SessionDetailPage() {
                 <div>
                   <CardTitle className="text-2xl">{session.title}</CardTitle>
                   <CardDescription className="flex items-center gap-4 mt-2">
-                    <Badge variant="secondary">{getBodyAreaLabel(session.bodyArea)}</Badge>
-                    <div className="flex items-center text-sm text-muted-foreground">
+                    <Badge className="text-secondary bg-transparent border-1 border-gray-500" variant="secondary">{getBodyAreaLabel(session.bodyArea)}</Badge>
+                    <div className="flex items-center text-sm text-secondary">
                       <Clock className="h-4 w-4 mr-1" />
                       {session.durationMins} минути
                     </div>
@@ -200,7 +219,7 @@ export default function SessionDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">{session.description || "Без описание"}</p>
+              <p className="text-secondary">{session.description || "Без описание"}</p>
             </CardContent>
           </Card>
 
@@ -213,7 +232,7 @@ export default function SessionDetailPage() {
                   <CardDescription>Упражнения включени в тази сесия</CardDescription>
                 </div>
                 {canManageSessions && (
-                  <Button onClick={() => setShowExerciseForm(true)}>
+                  <Button variant="white" onClick={() => setShowExerciseForm(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Добави упражнение
                   </Button>
@@ -243,20 +262,18 @@ export default function SessionDetailPage() {
 
                     return (
                       <div key={rowKey}>
-                        <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center justify-between p-4 border-1 border-gray-500 rounded-lg">
                           <div className="flex items-center gap-4">
-                            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
+                            <div className="w-8 h-8 bg-secondary text-primary rounded-full flex items-center justify-center text-sm font-medium">
                               {index + 1}
                             </div>
                             <div>
                               <h4 className="font-medium">
                                 {sessionExercise.name ?? sessionExercise?.exercise?.name ?? "—"}
                               </h4>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                {/* <Badge variant="outline">
-                                  {sessionExercise.muscle ?? sessionExercise?.exercise?.muscle ?? "—"}
-                                </Badge> */}
-                                <Badge variant="outline">
+                              <div className="flex items-center gap-4 text-sm text-secondary">
+
+                                <Badge className="text-secondary" variant="outline">
   {getMuscleLabel(sessionExercise.muscle ?? sessionExercise?.exercise?.muscle)}
 </Badge>
                                 {sessionExercise.repetitions && <span>{sessionExercise.repetitions} повторения</span>}
@@ -269,6 +286,7 @@ export default function SessionDetailPage() {
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
+                                className="border-1 border-gray-500"
                                 variant="ghost"
                                 onClick={() => {
                                   setEditingExercise(sessionExercise)
@@ -282,7 +300,7 @@ export default function SessionDetailPage() {
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
-                                    className="cursor-pointer"
+                                    className="cursor-pointer bg-transparent border-1 border-gray-500"
                                     variant="outline"
                                     size="sm"
                                     disabled={!pivotId || isDeleting}
@@ -291,7 +309,7 @@ export default function SessionDetailPage() {
                                     {isDeleting ? (
                                       <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
-                                      <Trash2 className="w-4 h-4" />
+                                      <Trash2 className="w-4 h-4 text-secondary" />
                                     )}
                                   </Button>
                                 </AlertDialogTrigger>
@@ -306,7 +324,7 @@ export default function SessionDetailPage() {
                                     <AlertDialogCancel>Отказ</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => pivotId && handleDeleteExercise(pivotId)}
-                                      className="bg-destructive text-white hover:bg-destructive/90"
+                                      className="bg-destructive text-secondary hover:bg-destructive/90"
                                       disabled={!pivotId}
                                     >
                                       Изтрий
@@ -318,7 +336,7 @@ export default function SessionDetailPage() {
                           )}
                         </div>
 
-                        {index < exercises.length - 1 && <Separator className="my-2" />}
+                        {index < exercises.length - 1 }
                       </div>
                     )
                   })}

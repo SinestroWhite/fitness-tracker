@@ -53,11 +53,35 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="bg-[url(/herologin.jpg)] h-screen bg-cover overflow-hidden">
+           <header className="bg-primary text-secondary">
+        {/* Main navigation */}
+        <div className="relative">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex justify-between items-center">
+              {/* Logo */}
+              <div className="flex items-center gap-2">
+
+                <span className="text-2xl font-bold text-secondary">Фитнес Тракър</span>
+              </div>
+
+
+              <div className="flex items-center gap-4">
+          <Button onClick={()=> router.push("/login")} className="px-4 py-2 rounded bg-secondary text-primary font-semibold hover:bg-gray-100">
+            ВХОД
+          </Button>
+        </div>
+
+            </div>
+          </div>
+        </div>
+      </header>
+
+    <div className="min-h-screen flex items-center justify-center  p-4">
+      <Card className="w-full max-w-md bg-gray-950/25 backdrop-blur-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Регистрация</CardTitle>
-          <CardDescription className="text-center">Създайте нов профил за достъп до приложението</CardDescription>
+          <CardTitle className="text-2xl font-bold text-center text-secondary">Регистрация</CardTitle>
+          <CardDescription className="text-center ">Създайте нов профил за достъп до приложението</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,7 +167,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full cursor-pointer" disabled={loading}>
+            <Button type="submit" className="w-full cursor-pointer bg-secondary text-primary" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 cursor-pointer h-4 w-4 animate-spin" />
@@ -156,13 +180,14 @@ export default function RegisterPage() {
           </form>
 
           <div className="mt-4 text-center text-sm">
-            <span className="text-muted-foreground">Вече имате профил? </span>
-            <Link href="/login" className="text-primary hover:underline">
+            <span className="text-secondary">Вече имате профил? </span>
+            <Link href="/login" className="text-secondary hover:underline">
               Влезте тук
             </Link>
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   )
 }

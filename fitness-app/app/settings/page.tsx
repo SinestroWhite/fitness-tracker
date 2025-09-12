@@ -73,7 +73,7 @@ export default function SettingsPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Настройки</h1>
-          <p className="text-muted-foreground">Управлявайте настройките на вашия профил и приложението</p>
+          <p className="text-primary">Управлявайте настройките на вашия профил и приложението</p>
         </div>
 
         <div className="grid gap-6">

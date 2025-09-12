@@ -78,7 +78,7 @@ export default function ClientProgressPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Прогрес на {clientName}</h1>
-            <p className="text-muted-foreground">Преглед на напредъка на клиента</p>
+            <p className="text-primary">Преглед на напредъка на клиента</p>
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default function ClientProgressPage() {
                           className="cursor-pointer hover:bg-muted"
                           onClick={() => handleViewImages(entry.images || [])}
                         >
-                          <ImageIcon className="h-3 w-3 mr-1" />
+                          <ImageIcon className="h-3 w-3 mr-1 text-secondary" />
                           {entry.images.length} снимки
                         </Badge>
                       )}

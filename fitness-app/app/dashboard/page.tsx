@@ -10,6 +10,7 @@ import { TrendingUp, Users, Dumbbell, Target, Plus, Calendar } from "lucide-reac
 import Link from "next/link"
 import { apiService } from "@/lib/api"
 import { useEffect, useState } from "react"
+import { GradientStatCard } from "@/components/dashboard/gradient-stat-card"
 
 interface DashboardStats {
   currentWeight?: string
@@ -196,19 +197,19 @@ export default function DashboardPage() {
   const renderUserDashboard = () => (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <StatsCard
+        <GradientStatCard
           title="Текущо тегло"
           value={stats.currentWeight || "Няма данни"}
           icon={TrendingUp}
           trend={stats.weightChange}
         />
-        <StatsCard
+        <GradientStatCard
           title="Тренировки този месец"
           value={stats.workoutsThisMonth || 0}
           icon={Dumbbell}
           trend={stats.workoutChange}
         />
-        <StatsCard
+        <GradientStatCard
           title="Прогрес към целта"
           value={stats.goalProgress || "Не е зададена"}
           icon={Target}
@@ -220,25 +221,19 @@ export default function DashboardPage() {
         <RecentActivity activities={activities} />
         <Card>
           <CardHeader>
-            <CardTitle>Бързи действия</CardTitle>
-            <CardDescription>Често използвани функции</CardDescription>
+            <CardTitle className="text-secondary">Бързи действия</CardTitle>
+            <CardDescription >Често използвани функции</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Button asChild className="w-full cursor-pointer justify-start">
+            <Button variant="new" asChild>
               <Link href="/progress">
                 <Plus className="mr-2 h-4 w-4" />
                 Добави прогрес
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full cursor-pointer justify-start bg-transparent">
-              <Link href="/workouts">
-                <Calendar className="mr-2 h-4 w-4" />
-                Планирай тренировка
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full cursor-pointer justify-start bg-transparent">
-              <Link href="/profile">
-                <Target className="mr-2 h-4 w-4" />
+            <Button variant="new" asChild >
+              <Link className="text-secondary" href="/profile">
+                <Target className="mr-2 h-4 w-4 text-secondary" />
                 Обнови цели
               </Link>
             </Button>
@@ -274,13 +269,13 @@ export default function DashboardPage() {
             <CardDescription>Управление на клиенти и тренировки</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Button asChild className="w-full cursor-pointer justify-start">
+            <Button variant="new" asChild className="w-full cursor-pointer justify-start">
               <Link href="/clients">
                 <Users className="mr-2 h-4 w-4" />
                 Управление на клиенти
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full cursor-pointer justify-start bg-transparent">
+            <Button variant="new" asChild  className="w-full cursor-pointer justify-start bg-transparent">
               <Link href="/workouts">
                 <Plus className="mr-2 h-4 w-4" />
                 Създай тренировка
@@ -318,13 +313,13 @@ export default function DashboardPage() {
             <CardDescription>Системно управление</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Button asChild className="w-full cursor-pointer justify-start">
+            <Button asChild variant="new">
               <Link href="/users">
                 <Users className="mr-2 h-4 w-4" />
                 Управление на потребители
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full cursor-pointer justify-start bg-transparent">
+            <Button variant="new" asChild >
               <Link href="/settings">
                 <Target className="mr-2 h-4 w-4" />
                 Системни настройки
@@ -340,8 +335,8 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Добре дошли, {user.name}!</h1>
-          <p className="text-muted-foreground">Ето преглед на вашата активност и прогрес</p>
+          <h1 className="text-3xl font-bold text-secondary">Добре дошли, {user.name}! 👋</h1>
+          <p className="text-secondary">Ето преглед на вашата активност и прогрес</p>
         </div>
 
         {user.role === "user" && renderUserDashboard()}

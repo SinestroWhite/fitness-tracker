@@ -90,7 +90,7 @@ export default function WorkoutPlansPage() {
     try {
       setLoading(true)
       const params: WorkoutPlanListParams = {
-        pageSize: 100,
+        pageSize: 1000,
       }
 
       // Оставяме филтъра по цел към бекенда (ако е поддържан)
@@ -122,24 +122,7 @@ export default function WorkoutPlansPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGoal])
 
-  // const handleDelete = async (id: string) => {
-  //   if (!confirm("Сигурни ли сте, че искате да изтриете този тренировъчен план?")) return
 
-  //   try {
-  //     await apiService.deleteWorkoutPlan(id)
-  //     toast({
-  //       title: "Успех",
-  //       description: "Тренировъчният план е изтрит успешно",
-  //     })
-  //     fetchWorkoutPlans()
-  //   } catch (error) {
-  //     toast({
-  //       title: "Грешка",
-  //       description: "Неуспешно изтриване на тренировъчния план",
-  //       variant: "destructive",
-  //     })
-  //   }
-  // }
   const confirmDelete = (plan: WorkoutPlan) => {
     setPlanToDelete(plan)
     setDeleteDialogOpen(true)
@@ -177,13 +160,13 @@ export default function WorkoutPlansPage() {
   const getGoalColor = (goal: string) => {
     switch (goal) {
       case "lose":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-red-600 text-red-50"
       case "gain":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-green-600 text-green-50"
       case "maintain":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-blue-600 text-blue-50"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "bg-gray-600 text-gray-50"
     }
   }
 
@@ -207,14 +190,14 @@ export default function WorkoutPlansPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6 ">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Тренировъчни планове</h1>
-              <p className="text-muted-foreground">Управление на тренировъчни планове и програми</p>
+              <h1 className="text-3xl text-secondary font-bold">Тренировъчни планове</h1>
+              <p className="text-secondary">Управление на тренировъчни планове и програми</p>
             </div>
             {canManagePlans && (
-              <Button onClick={() => setShowForm(true)}>
+              <Button variant="white" onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Нов план
               </Button>
@@ -223,13 +206,13 @@ export default function WorkoutPlansPage() {
 
           {/* Filters */}
           <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <div className="relative  flex-1">
+              <Search className="absolute  left-3 top-1/2 transform -translate-y-1/2 text-secondary h-4 w-4" />
               <Input
                 placeholder="Търси планове..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-1 text-secondary border-gray-500"
               />
             </div>
             <Select value={selectedGoal} onValueChange={setSelectedGoal}>
@@ -249,7 +232,7 @@ export default function WorkoutPlansPage() {
 
           {/* Optional: резултат брояч */}
           {(debouncedSearch || selectedGoal !== "all") && !loading && (
-            <p className="text-sm text-muted-foreground">Намерени: {filteredPlans.length}</p>
+            <p className="text-sm text-secondary">Намерени: {filteredPlans.length}</p>
           )}
 
           {/* Workout Plans Grid */}
@@ -304,12 +287,12 @@ export default function WorkoutPlansPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-secondary">
                         Създаден на {new Date((plan as any).createdAt).toLocaleDateString("bg-BG")}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex  gap-2">
                         <Link href={`/workout-plans/${plan.id}`}>
-                          <Button size="sm" variant="outline" className="flex-1 bg-transparent">
+                          <Button size="sm" variant="white" className="flex-1">
                             <Eye className="h-4 w-4 mr-2" />
                             Детайли
                           </Button>
@@ -324,7 +307,7 @@ export default function WorkoutPlansPage() {
 
           {!loading && filteredPlans.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">Няма намерени тренировъчни планове</p>
+              <p className="text-secondary">Няма намерени тренировъчни планове</p>
             </div>
           )}
         </div>
@@ -394,7 +377,7 @@ export default function WorkoutPlansPage() {
       </AlertDialogCancel>
       <AlertDialogAction
         onClick={handleConfirmDelete}
-        className="bg-destructive text-white hover:bg-destructive/90"
+        className="bg-destructive text-secondary hover:bg-destructive/90"
         disabled={deleting}
       >
         {deleting ? "Изтриване..." : "Изтрий"}

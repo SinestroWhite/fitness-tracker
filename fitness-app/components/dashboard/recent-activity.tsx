@@ -18,13 +18,13 @@ export function RecentActivity({ activities }: RecentActivityProps) {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800"
+        return "bg-green-300 text-green-800"
       case "in-progress":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-300 text-blue-800"
       case "missed":
-        return "bg-red-100 text-red-800"
+        return "bg-red-300 text-red-800"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-300 text-gray-800"
     }
   }
 
@@ -44,27 +44,27 @@ export function RecentActivity({ activities }: RecentActivityProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Последна активност</CardTitle>
+        <CardTitle className="text-secondary">Последна активност</CardTitle>
         <CardDescription>Вашите последни действия и прогрес</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {activities.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Няма записана активност</p>
+            <p className="text-sm text-secondary text-center py-4">Няма записана активност</p>
           ) : (
             activities.map((activity) => (
               <div key={activity.id} className="flex items-start space-x-3">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{activity.title}</p>
+                    <p className="text-sm font-medium text-secondary">{activity.title}</p>
                     {activity.status && (
                       <Badge variant="secondary" className={getStatusColor(activity.status)}>
                         {getStatusText(activity.status)}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground">{activity.timestamp}</p>
+                  <p className="text-xs text-secondary">{activity.description}</p>
+                  <p className="text-xs text-secondary">{activity.timestamp}</p>
                 </div>
               </div>
             ))

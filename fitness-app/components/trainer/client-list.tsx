@@ -5,17 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { Search, Eye, TrendingUp, Calendar, X } from "lucide-react"
 import { apiService, type UserPersonal } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
@@ -136,6 +127,19 @@ export function ClientList() {
         return "outline"
     }
   }
+  const getGoalBadgeClass = (goal?: string) => {
+    switch (goal) {
+      case "lose":
+        return "bg-red-600 text-red-50 dark:bg-red-900/30 dark:text-red-200 border-transparent"
+      case "gain":
+        return "bg-emerald-600 text-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-200 border-transparent"
+      case "keep":
+        return "bg-sky-600 text-sky-50 dark:bg-sky-900/30 dark:text-sky-200 border-transparent"
+      default:
+        return "bg-primary text-secondary"
+    }
+  }
+  
 
   // NEW: handler-и за търсене/изчистване
   const applySearch = () => setSearchTerm(searchInput.trim())
@@ -164,31 +168,32 @@ export function ClientList() {
                 if (e.key === "Enter") applySearch()
                 if (e.key === "Escape") clearSearch()
               }}
-              className="flex-1"
+              className="flex-1 border-1 border-gray-500"
             />
             <Button
               className="cursor-pointer"
               onClick={applySearch}
               title="Търси"
+              variant="white"
             >
               <Search className="h-4 w-4 mr-1" />
               Търси
             </Button>
+
             <Button
-              className="cursor-pointer"
-              variant="outline"
+              className="cursor-pointer border-1 border-gray-500"
               onClick={clearSearch}
               disabled={!searchInput && !searchTerm}
               title="Изчисти"
             >
-              <X className="h-4 w-4 mr-1" />
+              <X className="h-4 w-4 mr-1 text-secondary" />
               Изчисти
             </Button>
           </div>
 
           {/* Показваме активния филтър (по желание) */}
           {searchTerm && (
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-secondary mt-2">
               Активен филтър: <span className="font-medium">{searchTerm}</span>
             </p>
           )}
@@ -212,12 +217,12 @@ export function ClientList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Клиент</TableHead>
-                  <TableHead>Цел</TableHead>
-                  <TableHead>Височина</TableHead>
-                  <TableHead>Пол</TableHead>
-                  <TableHead>Регистриран</TableHead>
-                  <TableHead>Действия</TableHead>
+                  <TableHead className="text-secondary">Клиент</TableHead>
+                  <TableHead className="text-secondary">Цел</TableHead>
+                  <TableHead className="text-secondary">Височина</TableHead>
+                  <TableHead className="text-secondary">Пол</TableHead>
+                  <TableHead className="text-secondary">Регистриран</TableHead>
+                  <TableHead className="text-secondary">Действия</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,18 +231,18 @@ export function ClientList() {
                     <TableCell>
                       <div>
                         <p className="font-medium">{client.name}</p>
-                        <p className="text-sm text-muted-foreground">{client.email}</p>
+                        <p className="text-sm text-secondary">{client.email}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getGoalBadgeVariant(client.personal?.goal)}>
+                      <Badge  variant={getGoalBadgeVariant(client.personal?.goal)}  className={getGoalBadgeClass(client.personal?.goal)}>
                         {getGoalText(client.personal?.goal)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {client.personal?.height ? `${client.personal.height} см` : "Не е зададена"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-secondary">
                       {client.personal?.sex === "male"
                         ? "Мъж"
                         : client.personal?.sex === "female"
@@ -252,101 +257,12 @@ export function ClientList() {
                       })}
                     </TableCell>
                     <TableCell>
-                      {/* <Dialog
-                        open={selectedClient?.id === client.id}
-                        onOpenChange={(open) => {
-                          if (open) setSelectedClient(client)
-                          else setSelectedClient(null)
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button className="cursor-pointer" variant="outline" size="sm"> */}
-                          <Button variant="outline" size="sm" onClick={() => handleViewClient(client.id)}>
-                            <Eye className="h-4 w-4 mr-1" />
+
+                          <Button className="text-primary" variant="outline" size="sm" onClick={() => handleViewClient(client.id)}>
+                            <Eye className="h-4 w-4 mr-1 text-primary" />
                             Детайли
                           </Button>
-                        {/* </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Профил на клиент</DialogTitle>
-                            <DialogDescription>Детайлна информация за {client.name}</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-6">
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <Card>
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-sm flex items-center">
-                                    <Calendar className="mr-2 h-4 w-4" />
-                                    Основна информация
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                  <div>
-                                    <Label className="text-xs text-muted-foreground">Име</Label>
-                                    <p className="font-medium">{client.name}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-xs text-muted-foreground">Имейл</Label>
-                                    <p className="font-medium">{client.email}</p>
-                                  </div>
-                                  <div>
-                                    <Label className="text-xs text-muted-foreground">Регистриран</Label>
-                                    <p className="font-medium">
-                                      {new Date(client.createdAt).toLocaleDateString("bg-BG", {
-                                        year: "numeric",
-                                        month: "long",
-                                        day: "numeric",
-                                      })}
-                                    </p>
-                                  </div>
-                                </CardContent>
-                              </Card>
-
-                              <Card>
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-sm flex items-center">
-                                    <TrendingUp className="mr-2 h-4 w-4" />
-                                    Фитнес данни
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                  {client.personal ? (
-                                    <>
-                                      <div>
-                                        <Label className="text-xs text-muted-foreground">Цел</Label>
-                                        <p className="font-medium">{getGoalText(client.personal.goal)}</p>
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs text-muted-foreground">Височина</Label>
-                                        <p className="font-medium">{client.personal.height} см</p>
-                                      </div>
-                                      <div>
-                                        <Label className="text-xs text-muted-foreground">Пол</Label>
-                                        <p className="font-medium">
-                                          {client.personal.sex === "male" ? "Мъж" : "Жена"}
-                                        </p>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <p className="text-sm text-muted-foreground">Няма фитнес данни</p>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            </div>
-
-                            <div className="flex space-x-2">
-                              <Button variant="outline" className="flex-1 cursor-pointer bg-transparent">
-                                <Calendar className="mr-2 h-4 w-4" />
-                                Планирай тренировка
-                              </Button>
-                              <Button variant="outline" className="flex-1 cursor-pointer bg-transparent">
-                                <TrendingUp className="mr-2 h-4 w-4" />
-                                Виж прогрес
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog> */}
+                    
                     </TableCell>
                   </TableRow>
                 ))}

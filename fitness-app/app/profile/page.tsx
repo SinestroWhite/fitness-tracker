@@ -155,8 +155,8 @@ export default function ProfilePage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Моят профил</h1>
-          <p className="text-muted-foreground">Управлявайте информацията за вашия профил и фитнес данни</p>
+          <h1 className="text-3xl text-secondary font-bold">Моят профил</h1>
+          <p className="text-secondary">Управлявайте информацията за вашия профил и фитнес данни</p>
         </div>
 
          {/* Personal Fitness Data Card */}
@@ -205,6 +205,7 @@ export default function ProfilePage() {
                       type="number"
                       min="100"
                       max="250"
+                      className="border-1 border-gray-500"
                       value={personalData.height}
                       onChange={(e) =>
                         setPersonalData({
@@ -238,41 +239,9 @@ export default function ProfilePage() {
                   </Select>
                 </div>
 
-                {/* <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="nutritionPlan">План за хранене (по избор)</Label>
-                    <Input
-                      id="nutritionPlan"
-                      placeholder="ID на план за хранене"
-                      value={personalData.nutritionPlanId}
-                      onChange={(e) =>
-                        setPersonalData({
-                          ...personalData,
-                          nutritionPlanId: e.target.value,
-                        })
-                      }
-                      disabled={personalLoading}
-                    />
-                  </div>
+           
 
-                  <div className="space-y-2">
-                    <Label htmlFor="workoutPlan">План за тренировки (по избор)</Label>
-                    <Input
-                      id="workoutPlan"
-                      placeholder="ID на план за тренировки"
-                      value={personalData.workoutPlanId}
-                      onChange={(e) =>
-                        setPersonalData({
-                          ...personalData,
-                          workoutPlanId: e.target.value,
-                        })
-                      }
-                      disabled={personalLoading}
-                    />
-                  </div>
-                </div> */}
-
-                <Button className="cursor-pointer" type="submit" disabled={personalLoading}>
+                <Button variant="white" className="cursor-pointer " type="submit" disabled={personalLoading}>
                   {personalLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -313,6 +282,7 @@ export default function ProfilePage() {
                       id="name"
                       value={userData.name ?? ""}
                       onChange={(e) => setUserData({ ...userData, name: e.target.value })}
+                      className="border-1 border-gray-500"
                       disabled={userLoading}
                       required
                     />
@@ -326,6 +296,7 @@ export default function ProfilePage() {
                       value={userData.email ?? ""}
                       onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                       disabled={userLoading}
+                      className="border-1 border-gray-500"
                       required
                     />
                   </div>
@@ -333,14 +304,14 @@ export default function ProfilePage() {
 
                 <div className="space-y-2">
                   <Label>Роля</Label>
-                  <div className="text-sm text-muted-foreground capitalize">
+                  <div className="text-sm text-secondary capitalize">
                     {user.role === "user" && "Потребител"}
                     {user.role === "trainer" && "Треньор"}
                     {user.role === "admin" && "Администратор"}
                   </div>
                 </div>
 
-                <Button className="cursor-pointer" type="submit" disabled={userLoading}>
+                <Button variant="white" className="cursor-pointer" type="submit" disabled={userLoading}>
                   {userLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

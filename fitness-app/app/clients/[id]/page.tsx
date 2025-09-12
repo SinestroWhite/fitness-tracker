@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Calendar, TrendingUp, User, Mail, Ruler, Target, Weight, ImageIcon, Dumbbell, X } from "lucide-react"
-import { apiService, type UpdateUserPersonalData, type Progress, type WorkoutPlan } from "@/lib/api"
+import { apiService, type UpdateUserPersonalData, type Progress, type WorkoutPlan, type NutritionPlan} from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
@@ -41,6 +41,19 @@ interface PersonalView {
   workoutPlanId?: number | null
 }
 
+const getGoalBadgeClass = (goal?: string) => {
+  switch (goal) {
+    case "lose":
+      return "bg-red-600 text-red-50 dark:bg-red-900/30 dark:text-red-200 border-transparent"
+    case "gain":
+      return "bg-emerald-600 text-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-200 border-transparent"
+    case "keep":
+      return "bg-sky-600 text-sky-50 dark:bg-sky-900/30 dark:text-sky-200 border-transparent"
+    default:
+      return "bg-primary text-secondary"
+  }
+}
+
 
 export default function ClientDetailsPage() {
   const params = useParams()
@@ -57,6 +70,10 @@ export default function ClientDetailsPage() {
   const [showAssignDialog, setShowAssignDialog] = useState(false)
   const { toast } = useToast()
 
+  const [nutritionPlans, setNutritionPlans] = useState<NutritionPlan[]>([])
+  const [currentNutritionPlan, setCurrentNutritionPlan] = useState<NutritionPlan | null>(null)
+  const [assigningNutrition, setAssigningNutrition] = useState(false)
+  const [showNutritionAssignDialog, setShowNutritionAssignDialog] = useState(false)
 
 // 👉 планове за показване в "Смени план" (без текущия)
 const switchablePlans = useMemo(() => {
@@ -64,6 +81,12 @@ const switchablePlans = useMemo(() => {
   const curId = String(currentWorkoutPlan.id)
   return workoutPlans.filter(p => String(p.id) !== curId)
 }, [workoutPlans, currentWorkoutPlan])
+
+const switchableNutritionPlans = useMemo(() => {
+  if (!currentNutritionPlan) return nutritionPlans
+  const curId = String(currentNutritionPlan.id)
+  return nutritionPlans.filter(p => String(p.id) !== curId)
+}, [nutritionPlans, currentNutritionPlan])
 
   const loadClientDetails = async () => {
     try {
@@ -109,6 +132,17 @@ const switchablePlans = useMemo(() => {
         setCurrentWorkoutPlan(null)
       }
 
+      if (mapped.personal?.nutritionPlanId) {
+        try {
+          const nutritionPlan = await apiService.getNutritionPlan(mapped.personal.nutritionPlanId.toString(), "meals")
+          setCurrentNutritionPlan(nutritionPlan)
+        } catch (error) {
+          setCurrentNutritionPlan(null)
+        }
+      } else {
+        setCurrentNutritionPlan(null)
+      }
+
       // FIX 2: do NOT wrap in [ ... ] — getProgress already returns Progress[]
       try {
         const progressData = await apiService.getProgress(clientId)
@@ -136,6 +170,19 @@ const switchablePlans = useMemo(() => {
       toast({
         title: "Грешка",
         description: "Неуспешно зареждане на тренировъчните планове",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const loadNutritionPlans = async () => {
+    try {
+      const response = await apiService.getNutritionPlans({ pageSize: 100 })
+      setNutritionPlans(response.data)
+    } catch (error) {
+      toast({
+        title: "Грешка",
+        description: "Неуспешно зареждане на плановете за хранене",
         variant: "destructive",
       })
     }
@@ -192,9 +239,60 @@ const switchablePlans = useMemo(() => {
     }
   }
 
+  const handleAssignNutritionPlan = async (nutritionPlanId: string) => {
+    try {
+      setAssigningNutrition(true)
+      await apiService.changeNutritionPlanToClient(clientId, nutritionPlanId)
+
+      toast({
+        title: "Успех",
+        description: "Планът за хранене е присвоен успешно",
+      })
+
+      setShowNutritionAssignDialog(false)
+      await loadClientDetails()
+    } catch (error) {
+      toast({
+        title: "Грешка",
+        description: "Неуспешно присвояване на плана за хранене",
+        variant: "destructive",
+      })
+    } finally {
+      setAssigningNutrition(false)
+    }
+  }
+
+  const handleRemoveNutritionPlan = async () => {
+    try {
+      setAssigningNutrition(true)
+
+      const payload: UpdateUserPersonalData = {
+        nutritionPlanId: null,
+      }
+
+      await apiService.updateUserPersonalByUserId(clientId, payload)
+
+      toast({
+        title: "Успех",
+        description: "Планът за хранене е премахнат успешно",
+      })
+
+      await loadClientDetails()
+    } catch (error) {
+      toast({
+        title: "Грешка",
+        description: "Неуспешно премахване на плана за хранене",
+        variant: "destructive",
+      })
+    } finally {
+      setAssigningNutrition(false)
+    }
+  }
+
   useEffect(() => {
     if (clientId) loadClientDetails()
       loadWorkoutPlans()
+      loadNutritionPlans()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
@@ -256,8 +354,8 @@ const switchablePlans = useMemo(() => {
   </Button>
 
   <div className="ml-4">
-    <h1 className="text-2xl font-bold">{client.name}</h1>
-    <p className="text-muted-foreground">Детайли за клиент</p>
+    <h1 className="text-2xl text-secondary font-bold">{client.name}</h1>
+    <p className="text-secondary">Детайли за клиент</p>
   </div>
 
   {/* <Button
@@ -279,23 +377,23 @@ const switchablePlans = useMemo(() => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-3">
-                <User className="h-4 w-4 text-muted-foreground" />
+                <User className="h-4 w-4 text-secondary" />
                 <div>
-                  <Label className="text-xs text-muted-foreground">Име</Label>
+                  <Label className="text-xs text-secondary">Име</Label>
                   <p className="font-medium">{client.name}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <Mail className="h-4 w-4 text-muted-foreground" />
+                <Mail className="h-4 w-4 text-secondary" />
                 <div>
-                  <Label className="text-xs text-muted-foreground">Имейл</Label>
+                  <Label className="text-xs text-secondary">Имейл</Label>
                   <p className="font-medium">{client.email}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Calendar className="h-4 w-4 text-secondary" />
                 <div>
-                  <Label className="text-xs text-muted-foreground">Регистриран</Label>
+                  <Label className="text-xs text-secondary">Регистриран</Label>
                   <p className="font-medium">
                     {new Date(client.createdAt).toLocaleDateString("bg-BG", { year: "numeric", month: "long", day: "numeric" })}
                   </p>
@@ -315,27 +413,27 @@ const switchablePlans = useMemo(() => {
               {client.personal ? (
                 <>
                   <div className="flex items-center space-x-3">
-                    <Target className="h-4 w-4 text-muted-foreground" />
+                    <Target className="h-4 w-4 text-secondary" />
                     <div>
-                      <Label className="text-xs text-muted-foreground">Цел</Label>
+                      <Label className="text-xs text-secondary">Цел</Label>
                       <div className="flex items-center space-x-2">
-                        <Badge variant={getGoalBadgeVariant(client.personal.goal)}>
+                        <Badge variant={getGoalBadgeVariant(client.personal.goal)}  className={getGoalBadgeClass(client.personal?.goal)}>
                           {getGoalText(client.personal.goal)}
                         </Badge>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <Ruler className="h-4 w-4 text-muted-foreground" />
+                    <Ruler className="h-4 w-4 text-secondary" />
                     <div>
-                      <Label className="text-xs text-muted-foreground">Височина</Label>
+                      <Label className="text-xs text-secondary">Височина</Label>
                       <p className="font-medium">{client.personal.height} см</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <User className="h-4 w-4 text-muted-foreground" />
+                    <User className="h-4 w-4 text-secondary" />
                     <div>
-                      <Label className="text-xs text-muted-foreground">Пол</Label>
+                      <Label className="text-xs text-secondary">Пол</Label>
                       <p className="font-medium">
                         {client.personal.sex === "male" ? "Мъж" : client.personal.sex === "female" ? "Жена" : "Не е зададен"}
                       </p>
@@ -343,7 +441,7 @@ const switchablePlans = useMemo(() => {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Няма налични фитнес данни</p>
+                <p className="text-sm text-secondary">Няма налични фитнес данни</p>
               )}
             </CardContent>
           </Card>
@@ -364,7 +462,7 @@ const switchablePlans = useMemo(() => {
                   <div className="space-y-1">
                     <p className="font-medium">{currentWorkoutPlan.title}</p>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-primary">
                         {currentWorkoutPlan.goal === "lose"
                           ? "Отслабване"
                           : currentWorkoutPlan.goal === "gain"
@@ -377,14 +475,14 @@ const switchablePlans = useMemo(() => {
                   <div className="flex items-center space-x-2">
                     <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button className="text-primary" variant="outline" size="sm">
                           Смени план
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Избери тренировъчен план</DialogTitle>
-                          <DialogDescription>Изберете тренировъчен план за клиента</DialogDescription>
+                          <DialogTitle className="text-secondary">Избери тренировъчен план</DialogTitle>
+                          <DialogDescription className="text-secondary">Изберете тренировъчен план за клиента</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="grid gap-2">
@@ -392,16 +490,16 @@ const switchablePlans = useMemo(() => {
                             {switchablePlans.map((plan) => (
   <div
     key={plan.id}
-    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted cursor-pointer"
+    className="flex items-center justify-between p-3 border rounded-lg cursor-pointer"
     onClick={() => handleAssignWorkoutPlan(String(plan.id))}
   >
     <div>
-      <p className="font-medium">{plan.title}</p>
-      <p className="text-sm text-muted-foreground">
+      <p className="font-medium text-secondary">{plan.title}</p>
+      <p className="text-sm text-secondary">
         {plan.goal === "lose" ? "Отслабване" : plan.goal === "gain" ? "Качване на тегло" : "Поддържане"}
       </p>
     </div>
-    <Button size="sm" disabled={assigningWorkout}>
+    <Button  size="sm" disabled={assigningWorkout}>
     {assigningWorkout ? "Избиране..." : "Избери"}
     </Button>
   </div>
@@ -410,40 +508,40 @@ const switchablePlans = useMemo(() => {
                         </div>
                       </DialogContent>
                     </Dialog>
-                    <Button variant="outline" size="sm" onClick={handleRemoveWorkoutPlan} disabled={assigningWorkout}>
-                      <X className="h-4 w-4 mr-1" />
+                    <Button className="text-primary" variant="outline" size="sm" onClick={handleRemoveWorkoutPlan} disabled={assigningWorkout}>
+                      <X className="h-4 w-4 mr-1 text-primary" />
                       Премахни
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Dumbbell className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <Dumbbell className="mx-auto h-12 w-12 text-secondary" />
                   <h3 className="mt-2 text-sm font-semibold">Няма избран тренировъчен план</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">Избери тренировъчен план на този клиент</p>
+                  <p className="mt-1 text-sm text-secondary">Избери тренировъчен план на този клиент</p>
                   <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
                     <DialogTrigger asChild>
-                      <Button className="mt-4">
+                      <Button variant="white"  className="mt-4">
                         <Dumbbell className="mr-2 h-4 w-4" />
                         Избери тренировъчен план
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Избери тренировъчен план</DialogTitle>
-                        <DialogDescription>Изберете тренировъчен план на клиента</DialogDescription>
+                        <DialogTitle className="text-secondary">Избери тренировъчен план</DialogTitle>
+                        <DialogDescription className="text-secondary">Изберете тренировъчен план на клиента</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div className="grid gap-2">
                           {workoutPlans.map((plan) => (
                             <div
                               key={plan.id}
-                              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted cursor-pointer"
+                              className="flex items-center justify-between p-3 border rounded-lg cursor-pointer"
                               onClick={() => handleAssignWorkoutPlan(plan.id)}
                             >
                               <div>
-                                <p className="font-medium">{plan.title}</p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="font-medium text-secondary">{plan.title}</p>
+                                <p className="text-sm text-secondary">
                                   {plan.goal === "lose"
                                     ? "Отслабване"
                                     : plan.goal === "gain"
@@ -453,6 +551,138 @@ const switchablePlans = useMemo(() => {
                               </div>
                               <Button size="sm" disabled={assigningWorkout}>
                                 {assigningWorkout ? "Избиране..." : "Избери"}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Target className="mr-2 h-5 w-5" />
+                План за хранене
+              </CardTitle>
+              <CardDescription>Управление на план за хранене</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentNutritionPlan ? (
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <p className="font-medium">{currentNutritionPlan.title}</p>
+                    <div className="flex items-center space-x-2">
+                      <Badge className="text-primary" variant="secondary">
+                        {currentNutritionPlan.goal === "lose"
+                          ? "Отслабване"
+                          : currentNutritionPlan.goal === "gain"
+                            ? "Качване на тегло"
+                            : "Поддържане"}
+                      </Badge>
+                      {currentNutritionPlan.meals && (
+                        <Badge className="text-secondary" variant="outline">{currentNutritionPlan.meals.length} ястия</Badge>
+                      )}
+                    </div>
+
+                  </div>
+                  <div className="flex items-center space-x-2">
+
+                    <Dialog open={showNutritionAssignDialog} onOpenChange={setShowNutritionAssignDialog}>
+  <DialogTrigger asChild>
+    <Button className="text-primary" variant="outline" size="sm">Смени план</Button>
+  </DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle className="text-secondary">Избери план за хранене</DialogTitle>
+      <DialogDescription className="text-secondary">Изберете план за хранене за на клиента</DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-4">
+      <div className="grid gap-2">
+        {switchableNutritionPlans.length === 0 ? (
+          <p className="text-sm text-secondary">Няма други налични планове за смяна</p>
+        ) : switchableNutritionPlans.map((plan) => (
+          <div
+            key={plan.id}
+            className="flex items-center justify-between p-3 border rounded-lg cursor-pointer"
+            onClick={() => handleAssignNutritionPlan(String(plan.id))}
+          >
+            <div>
+              <p className="font-medium text-secondary">{plan.title}</p>
+              <p className="text-sm text-secondary">
+                {plan.goal === "lose" ? "Отслабване" : plan.goal === "gain" ? "Качване на тегло" : "Поддържане"}
+              </p>
+              {plan.description && (
+                <p className="text-xs text-secondary mt-1">{plan.description}</p>
+              )}
+            </div>
+            <Button size="sm" disabled={assigningNutrition}>
+              {assigningNutrition ? "Избиране..." : "Избери"}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  </DialogContent>
+</Dialog>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveNutritionPlan}
+                      disabled={assigningNutrition}
+                      className="text-primary"
+                    >
+                      <X className="h-4 w-4 mr-1 text-primary" />
+                      Премахни
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Target className="mx-auto h-12 w-12 text-secondary" />
+                  <h3 className="mt-2 text-sm font-semibold">Няма избран план за хранене</h3>
+                  <p className="mt-1 text-sm text-secondary">Избери план за хранене на този клиент</p>
+                  <Dialog open={showNutritionAssignDialog} onOpenChange={setShowNutritionAssignDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="white" className="mt-4">
+                        <Target className="mr-2 h-4 w-4" />
+                        Избери план за хранене
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle className="text-secondary">Избери план за хранене</DialogTitle>
+                        <DialogDescription className="text-secondary">Изберете план за хранене на клиента</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="grid gap-2">
+                          {nutritionPlans.map((plan) => (
+                            <div
+                              key={plan.id}
+                              className="flex items-center justify-between p-3 border rounded-lg cursor-pointer"
+                              onClick={() => handleAssignNutritionPlan(plan.id)}
+                            >
+                              <div>
+                                <p className="font-medium text-secondary">{plan.title}</p>
+                                <p className="text-sm text-secondary">
+                                  {plan.goal === "lose"
+                                    ? "Отслабване"
+                                    : plan.goal === "gain"
+                                      ? "Качване на тегло"
+                                      : "Поддържане"}
+                                </p>
+                                {plan.description && (
+                                  <p className="text-xs text-secondary mt-1">{plan.description}</p>
+                                )}
+                              </div>
+                              <Button size="sm" disabled={assigningNutrition}>
+                                {assigningNutrition ? "Избиране..." : "Избери"}
                               </Button>
                             </div>
                           ))}
@@ -490,26 +720,25 @@ const switchablePlans = useMemo(() => {
             {progressEntries.length > 0 ? (
               <div className="space-y-4">
                 {progressEntries.map((entry) => (
-                  <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={entry.id} className="flex items-center justify-between p-4 border-1 border-gray-500 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 text-secondary" />
+                        <span className="text-sm text-secondary">
                           {new Date(entry.createdAt).toLocaleDateString("bg-BG")}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Weight className="h-4 w-4 text-muted-foreground" />
+                        <Weight className="h-4 w-4 text-secondary" />
                         <span className="font-medium">{entry.weightKg} кг</span>
                       </div>
-                      {entry.bodyFat != null && <Badge variant="secondary">{entry.bodyFat}% мазнини</Badge>}
                       {!!entry.images?.length && (
                         <Badge
                           variant="outline"
-                          className="cursor-pointer hover:bg-muted"
+                          className="cursor-pointer hover:bg-muted text-secondary"
                           onClick={() => handleViewImages(entry.images!)}
                         >
-                          <ImageIcon className="h-3 w-3 mr-1" />
+                          <ImageIcon className="h-3 w-3 mr-1 text-secondary" />
                           {entry.images!.length} снимки
                         </Badge>
                       )}
@@ -519,9 +748,9 @@ const switchablePlans = useMemo(() => {
               </div>
             ) : (
               <div className="text-center py-8">
-                <TrendingUp className="mx-auto h-12 w-12 text-muted-foreground" />
+                <TrendingUp className="mx-auto h-12 w-12 text-secondary" />
                 <h3 className="mt-2 text-sm font-semibold">Няма записи за прогрес</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm text-secondary">
                   Клиентът все още не е добавил записи за своя прогрес.
                 </p>
               </div>

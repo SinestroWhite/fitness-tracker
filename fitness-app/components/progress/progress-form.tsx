@@ -21,7 +21,6 @@ interface ProgressFormProps {
 export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressFormProps) {
   const [formData, setFormData] = useState<CreateProgressData>({
     weightKg: 0,
-    bodyFat: undefined,
     images: [],
   })
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -33,14 +32,12 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
     if (editingEntry) {
       setFormData({
         weightKg: editingEntry.weightKg,
-        bodyFat: editingEntry.bodyFat,
         images: editingEntry.images || [],
       })
       setSelectedFiles([]) // Clear selected files when editing
     } else {
       setFormData({
         weightKg: 0,
-        bodyFat: undefined,
         images: [],
       })
       setSelectedFiles([])
@@ -66,88 +63,134 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault()
+  //   setError("")
+  //   setLoading(true)
+
+  //   try {
+  //     if (formData.weightKg <= 0) {
+  //       throw new Error("Теглото трябва да е положително число")
+  //     }
+
+  //     let result: Progress
+
+  //     if (editingEntry) {
+  //       if (selectedFiles.length > 0) {
+  //         // Create FormData with both progress data and new images
+  //         const formDataWithFiles = new FormData()
+  //         formDataWithFiles.append("weightKg", formData.weightKg.toString())
+
+  //         selectedFiles.forEach((file) => {
+  //           formDataWithFiles.append("images", file)
+  //         })
+
+  //         result = await apiService.updateProgressWithImages(editingEntry.id, formDataWithFiles)
+
+  //         toast({
+  //           title: "Успех",
+  //           description: `Прогресът е обновен и ${selectedFiles.length} нови снимки са добавени`,
+  //         })
+  //       } else {
+  //         // Update only basic data without images
+  //         result = await apiService.updateProgress(editingEntry.id, {
+  //           weightKg: formData.weightKg,
+  //         })
+
+  //         toast({
+  //           title: "Успех",
+  //           description: "Прогресът е обновен успешно",
+  //         })
+  //       }
+  //     } else {
+  //       // Create new entry
+  //       if (selectedFiles.length > 0) {
+  //         // Use FormData for file upload
+  //         const formDataWithFiles = new FormData()
+  //         formDataWithFiles.append("weightKg", formData.weightKg.toString())
+
+  //         selectedFiles.forEach((file) => {
+  //           formDataWithFiles.append("images", file)
+  //         })
+
+  //         result = await apiService.uploadProgressImages(formDataWithFiles)
+  //       } else {
+  //         // Use JSON for data without files
+  //         result = await apiService.createProgress(formData)
+  //       }
+
+  //       toast({
+  //         title: "Успех",
+  //         description: "Прогресът е записан успешно",
+  //       })
+  //     }
+
+  //     onSuccess(result)
+
+  //     // Reset form only if not editing
+  //     if (!editingEntry) {
+  //       setFormData({
+  //         weightKg: 0,
+  //         images: [],
+  //       })
+  //       setSelectedFiles([])
+  //     }
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : "Грешка при записване на прогреса")
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setLoading(true)
-
+  
     try {
       if (formData.weightKg <= 0) {
         throw new Error("Теглото трябва да е положително число")
       }
-
-      if (formData.bodyFat !== undefined && (formData.bodyFat < 0 || formData.bodyFat > 100)) {
-        throw new Error("Мастната тъкан трябва да е между 0 и 100%")
-      }
-
+  
       let result: Progress
-
+  
       if (editingEntry) {
         if (selectedFiles.length > 0) {
-          // Create FormData with both progress data and new images
-          const formDataWithFiles = new FormData()
-          formDataWithFiles.append("weightKg", formData.weightKg.toString())
-          if (formData.bodyFat !== undefined) {
-            formDataWithFiles.append("bodyFat", formData.bodyFat.toString())
-          }
-
-          selectedFiles.forEach((file) => {
-            formDataWithFiles.append("images", file)
-          })
-
-          result = await apiService.updateProgressWithImages(editingEntry.id, formDataWithFiles)
-
+          const fd = new FormData()
+          fd.append("weightKg", formData.weightKg.toString())
+          selectedFiles.forEach((file) => fd.append("images", file))
+  
+          result = await apiService.updateProgressWithImages(editingEntry.id, fd)
+  
           toast({
             title: "Успех",
             description: `Прогресът е обновен и ${selectedFiles.length} нови снимки са добавени`,
           })
+          // по желание: onImagesUploaded?.()
         } else {
-          // Update only basic data without images
           result = await apiService.updateProgress(editingEntry.id, {
             weightKg: formData.weightKg,
-            bodyFat: formData.bodyFat,
           })
-
-          toast({
-            title: "Успех",
-            description: "Прогресът е обновен успешно",
-          })
+          toast({ title: "Успех", description: "Прогресът е обновен успешно" })
         }
       } else {
-        // Create new entry
         if (selectedFiles.length > 0) {
-          // Use FormData for file upload
-          const formDataWithFiles = new FormData()
-          formDataWithFiles.append("weightKg", formData.weightKg.toString())
-          if (formData.bodyFat !== undefined) {
-            formDataWithFiles.append("bodyFat", formData.bodyFat.toString())
-          }
-
-          selectedFiles.forEach((file) => {
-            formDataWithFiles.append("images", file)
-          })
-
-          result = await apiService.uploadProgressImages(formDataWithFiles)
+          const fd = new FormData()
+          fd.append("weightKg", formData.weightKg.toString())
+          selectedFiles.forEach((file) => fd.append("images", file))
+  
+          result = await apiService.uploadProgressImages(fd)
         } else {
-          // Use JSON for data without files
-          result = await apiService.createProgress(formData)
+          result = await apiService.createProgress({ weightKg: formData.weightKg })
         }
-
-        toast({
-          title: "Успех",
-          description: "Прогресът е записан успешно",
-        })
+        toast({ title: "Успех", description: "Прогресът е записан успешно" })
       }
-
+  
+      // 🔑 ВИНАГИ уведомявай родителя, за да рефрешне списъка
       onSuccess(result)
-
-      // Reset form only if not editing
+  
+      // reset само при добавяне
       if (!editingEntry) {
-        setFormData({
-          weightKg: 0,
-          bodyFat: undefined,
-          images: [],
-        })
+        setFormData({ weightKg: 0, images: [] })
         setSelectedFiles([])
       }
     } catch (err) {
@@ -156,6 +199,7 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
       setLoading(false)
     }
   }
+  
 
   return (
     <Card>
@@ -181,6 +225,7 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
                 type="number"
                 step="0.1"
                 min="1"
+                className="border-1 border-gray-500 text-secondary"
                 max="300"
                 value={formData.weightKg || ""}
                 onChange={(e) =>
@@ -191,25 +236,6 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
                 }
                 disabled={loading}
                 required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bodyFat">Мастна тъкан (%) - по избор</Label>
-              <Input
-                id="bodyFat"
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={formData.bodyFat || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    bodyFat: e.target.value ? Number.parseFloat(e.target.value) : undefined,
-                  })
-                }
-                disabled={loading}
               />
             </div>
           </div>
@@ -226,9 +252,9 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
                 multiple
                 onChange={handleFileChange}
                 disabled={loading}
-                className="cursor-pointer"
+                className="cursor-pointer border-1 border-gray-500"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-secondary">
                 💡 Можете да изберете няколко снимки наведнъж (Ctrl+Click или Cmd+Click)
               </p>
             </div>
@@ -240,7 +266,7 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
                   {selectedFiles.map((file, index) => (
                     <div key={index} className="relative group">
                       <div className="flex items-center space-x-2 bg-secondary rounded-md px-3 py-2 pr-8">
-                        <span className="text-sm truncate">{file.name}</span>
+                        <span className="text-sm truncate text-primary">{file.name}</span>
                       </div>
                       <Button
                         type="button"
@@ -262,8 +288,8 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
             )}
 
             {editingEntry && editingEntry.images && editingEntry.images.length > 0 && (
-              <div className="mt-2 p-3 bg-blue-50 rounded-md">
-                <p className="text-sm text-blue-700">
+              <div className="mt-2 p-3 bg-blue-950 rounded-md">
+                <p className="text-sm text-blue-100">
                   📸 Текущи снимки: {editingEntry.images.length}
                   <br />
                   <span className="text-xs">Новите снимки ще се добавят към съществуващите</span>
@@ -273,7 +299,7 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
           </div>
 
           <div className="flex space-x-2">
-            <Button className="cursor-pointer" type="submit" disabled={loading}>
+            <Button variant="white" className="cursor-pointer" type="submit" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -287,7 +313,7 @@ export function ProgressForm({ editingEntry, onSuccess, onCancel }: ProgressForm
               )}
             </Button>
             {onCancel && (
-              <Button className="cursor-pointer" type="button" variant="outline" onClick={onCancel} disabled={loading}>
+              <Button className="cursor-pointer" type="button"  onClick={onCancel} disabled={loading}>
                 Отказ
               </Button>
             )}

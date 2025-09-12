@@ -75,44 +75,44 @@ export function SystemStats() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Общо потребители</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
+          <Users className="h-4 w-4 text-secondary" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalUsers}</div>
-          <p className="text-xs text-muted-foreground">Активни потребители</p>
+          <p className="text-xs text-secondary">Активни потребители</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Треньори</CardTitle>
-          <UserCheck className="h-4 w-4 text-muted-foreground" />
+          <UserCheck className="h-4 w-4 text-secondary" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalTrainers}</div>
-          <p className="text-xs text-muted-foreground">Регистрирани треньори</p>
+          <p className="text-xs text-secondary">Регистрирани треньори</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Администратори</CardTitle>
-          <Shield className="h-4 w-4 text-muted-foreground" />
+          <Shield className="h-4 w-4 text-secondary" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalAdmins}</div>
-          <p className="text-xs text-muted-foreground">Системни администратори</p>
+          <p className="text-xs text-secondary">Системни администратори</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Нови потребители</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <TrendingUp className="h-4 w-4 text-secondary" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.recentUsers}</div>
-          <p className="text-xs text-muted-foreground">Последните 30 дни</p>
+          <p className="text-xs text-secondary">Последните 30 дни</p>
         </CardContent>
       </Card>
     </div>

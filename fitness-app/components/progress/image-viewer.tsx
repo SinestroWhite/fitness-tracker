@@ -120,19 +120,19 @@ export function ImageViewer({
             <DialogTitle className="flex items-center justify-between">
               <span>Снимки от прогреса</span>
               <div className="flex items-center space-x-2 pr-5">
-                <Badge variant="secondary">
+                <Badge className="text-secondary bg-transparent border-1 border-gray-500" variant="secondary">
                   {currentImageIndex + 1} от {images.length}
                 </Badge>
 
                 {canDelete && (
                   <Button
-                    className="cursor-pointer"
+                    className="cursor-pointer bg-transparent border-1 border-gray-500"
                     variant="outline"
                     size="sm"
                     onClick={() => setDeleteDialogOpen(true)}
                     disabled={deleting}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4 text-secondary" />
                   </Button>
                 )}
               </div>
@@ -208,7 +208,7 @@ export function ImageViewer({
               <AlertDialogCancel>Отказ</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteImage}
-                className="bg-destructive text-white hover:bg-destructive/90"
+                className="bg-destructive text-secondary hover:bg-destructive/90"
                 disabled={deleting}
               >
                 {deleting ? "Изтриване..." : "Изтрий"}

@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -41,6 +40,12 @@ interface SessionExerciseFormProps {
   excludeExerciseIds?: Array<string | number>
 }
 
+type FieldErrors = {
+  exerciseId?: string
+  repetitions?: string
+  time?: string
+}
+
 export function SessionExerciseForm({
   sessionId,
   sessionExercise,
@@ -57,10 +62,21 @@ export function SessionExerciseForm({
     time: "",
   })
 
+  // validation state
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [touched, setTouched] = useState({ exerciseId: false, repetitions: false, time: false })
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+
   const excludeSet = useMemo(
     () => new Set(excludeExerciseIds.map((x) => String(x))),
     [excludeExerciseIds]
   )
+
+  const availableExercises = useMemo(() => {
+    // When editing, keep the currently selected exercise visible even if excluded
+    if (sessionExercise) return exercises
+    return exercises.filter((ex: any) => !excludeSet.has(String(ex.id)))
+  }, [exercises, excludeSet, sessionExercise])
 
   useEffect(() => {
     fetchExercises()
@@ -79,6 +95,9 @@ export function SessionExerciseForm({
     } else {
       setFormData({ exerciseId: "", repetitions: "", time: "" })
     }
+    setErrors({})
+    setTouched({ exerciseId: false, repetitions: false, time: false })
+    setSubmitAttempted(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionExercise])
 
@@ -86,9 +105,6 @@ export function SessionExerciseForm({
     try {
       const response = await apiService.getExerciseList({ pageSize: 100 })
       const all: Exercise[] = response.data ?? []
-
-      // When creating, hide already-used exercises
-      //const filtered = sessionExercise ? all : all.filter((ex: any) => !excludeSet.has(String(ex.id)))
       setExercises(all)
     } catch {
       toast({
@@ -99,27 +115,43 @@ export function SessionExerciseForm({
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const validate = (vals: { exerciseId: string; repetitions: string; time: string }): FieldErrors => {
+    const e: FieldErrors = {}
 
-    const hasReps = formData.repetitions.trim() !== ""
-    const hasTime = formData.time.trim() !== ""
-    const count = (hasReps ? 1 : 0) + (hasTime ? 1 : 0)
-
-    if (!sessionExercise && !formData.exerciseId) {
-      toast({ title: "Грешка", description: "Моля изберете упражнение", variant: "destructive" })
-      return
+    if (!sessionExercise) {
+      if (!vals.exerciseId) e.exerciseId = "Моля, изберете упражнение."
+      else if (!availableExercises.some((ex: any) => String(ex.id) === String(vals.exerciseId))) {
+        e.exerciseId = "Невалидно упражнение."
+      }
     }
 
-    // XOR rule: exactly one of the fields must be provided
-    if (count !== 1) {
+    const repsStr = vals.repetitions.trim()
+    const timeStr = vals.time.trim()
+    const hasReps = repsStr !== ""
+    const hasTime = timeStr !== ""
+    const count = (hasReps ? 1 : 0) + (hasTime ? 1 : 0)
+
+
+    return e
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitAttempted(true)
+
+    const nextErrors = validate(formData)
+    setErrors(nextErrors)
+    if (nextErrors.exerciseId || nextErrors.repetitions || nextErrors.time) {
       toast({
-        title: "Грешка",
-        description: "Попълни само едно: или „Повторения“, или „Време“.",
+        title: "Има грешки във формата",
+        description: "Моля, коригирайте полетата, отбелязани в червено.",
         variant: "destructive",
       })
       return
     }
+
+    const hasReps = formData.repetitions.trim() !== ""
+    // const hasTime = formData.time.trim() !== "" // not needed below
 
     try {
       setLoading(true)
@@ -130,11 +162,10 @@ export function SessionExerciseForm({
           : { time: parseInt(formData.time, 10), repetitions: null }
         ) as any
 
-        await apiService.updateSessionExercise(sessionExercise.pivot_id, data)
+        await apiService.updateSessionExercise((sessionExercise as any).pivot_id, data)
         toast({ title: "Успех", description: "Упражнението е обновено успешно" })
       } else {
         const createPayload: AddSessionExerciseData = {
-
           exercise_id: Number(formData.exerciseId),
           ...(hasReps
             ? { repetitions: parseInt(formData.repetitions, 10) }
@@ -157,31 +188,44 @@ export function SessionExerciseForm({
     }
   }
 
-  const hasReps = formData.repetitions.trim() !== ""
-  const hasTime = formData.time.trim() !== ""
-  const noAvailable = !sessionExercise && exercises.length === 0
+  const showExerciseError = !!errors.exerciseId && (touched.exerciseId || submitAttempted)
+  const showRepsError = !!errors.repetitions && (touched.repetitions || submitAttempted)
+  const showTimeError = !!errors.time && (touched.time || submitAttempted)
+
+  const noAvailable = !sessionExercise && availableExercises.length === 0
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       {!sessionExercise && (
         <div className="space-y-2">
-          <Label htmlFor="exercise">Упражнение *</Label>
+          <Label className="text-secondary" htmlFor="exercise">Упражнение *</Label>
           <Select
-            value={formData.exerciseId}
-            onValueChange={(value) => setFormData({ ...formData, exerciseId: value })}
+            key={formData.exerciseId || "empty"}
+            value={formData.exerciseId || undefined}
+            onValueChange={(value) => {
+              setFormData({ ...formData, exerciseId: value })
+              if (!touched.exerciseId) setTouched((t) => ({ ...t, exerciseId: true }))
+            }}
             disabled={noAvailable}
           >
-            <SelectTrigger id="exercise">
+            <SelectTrigger
+              className={`text-secondary ${showExerciseError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+              id="exercise"
+              aria-required="true"
+              aria-invalid={showExerciseError}
+              aria-errormessage={showExerciseError ? "exercise-error" : undefined}
+            >
               <SelectValue placeholder={noAvailable ? "Няма свободни упражнения" : "Изберете упражнение"} />
             </SelectTrigger>
             <SelectContent>
-              {exercises.map((exercise: any) => (
+              {availableExercises.map((exercise: any) => (
                 <SelectItem key={String(exercise.id)} value={String(exercise.id)}>
                   {exercise.name} ({getMuscleLabel(exercise.muscle)})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {showExerciseError && <p id="exercise-error" className="text-sm text-destructive">{errors.exerciseId}</p>}
           {noAvailable && (
             <p className="text-sm text-muted-foreground">
               Всички упражнения вече са добавени към сесията.
@@ -192,10 +236,12 @@ export function SessionExerciseForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="repetitions">Повторения</Label>
+          <Label className="text-secondary" htmlFor="repetitions">Повторения</Label>
           <Input
             id="repetitions"
             type="number"
+            inputMode="numeric"
+            className={`text-secondary ${showRepsError ? "border-destructive focus-visible:ring-destructive" : ""}`}
             min="1"
             step="1"
             value={formData.repetitions}
@@ -206,20 +252,25 @@ export function SessionExerciseForm({
                 repetitions: v,
                 time: v ? "" : formData.time,
               })
+              if (!touched.repetitions) setTouched((t) => ({ ...t, repetitions: true }))
             }}
+            onBlur={() => setTouched((t) => ({ ...t, repetitions: true }))}
             placeholder="12"
-            required={!hasTime}
-            disabled={hasTime}
+            aria-invalid={showRepsError}
+            aria-errormessage={showRepsError ? "repetitions-error" : undefined}
           />
+          {showRepsError && <p id="repetitions-error" className="text-sm text-destructive">{errors.repetitions}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="time">Време (секунди)</Label>
+          <Label className="text-secondary" htmlFor="time">Време (секунди)</Label>
           <Input
             id="time"
             type="number"
+            inputMode="numeric"
             min="1"
             step="1"
+            className={`text-secondary ${showTimeError ? "border-destructive focus-visible:ring-destructive" : ""}`}
             value={formData.time}
             onChange={(e) => {
               const v = e.target.value
@@ -228,11 +279,14 @@ export function SessionExerciseForm({
                 time: v,
                 repetitions: v ? "" : formData.repetitions,
               })
+              if (!touched.time) setTouched((t) => ({ ...t, time: true }))
             }}
+            onBlur={() => setTouched((t) => ({ ...t, time: true }))}
             placeholder="30"
-            required={!hasReps}
-            disabled={hasReps}
+            aria-invalid={showTimeError}
+            aria-errormessage={showTimeError ? "time-error" : undefined}
           />
+          {showTimeError && <p id="time-error" className="text-sm text-destructive">{errors.time}</p>}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-
 
 const bodyAreas = [
   { value: "full_body", label: "Цяло тяло" },
@@ -57,39 +56,41 @@ const getBodyAreaLabel = (value?: string) => {
 export default function SessionsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [rawSessions, setRawSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
+
+  // 🔍 Търсене (дебоунснато) + локален филтър по част от тялото
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selectedBodyArea, setSelectedBodyArea] = useState<string>("all")
+
   const [showForm, setShowForm] = useState(false)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-
   const canManageSessions = user?.role === "trainer" || user?.role === "admin"
+
+  // ⏱️ Debounce на търсенето
+  useEffect(() => {
+    const h = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300)
+    return () => clearTimeout(h)
+  }, [searchTerm])
 
   const fetchSessions = async () => {
     try {
       setLoading(true)
 
-      // изпращаме snake_case към API; ако го игнорира, ще филтрираме фронтендски
-      const params: SessionListParams & Record<string, any> = { pageSize: 100 }
-      if (searchTerm) params.search = searchTerm
+      // Оставяме филтъра по част към бекенда (ако е поддържан). Търсенето е клиентско.
+      const params: SessionListParams & Record<string, any> = { pageSize: 1000 }
       if (selectedBodyArea !== "all") params.body_area = selectedBodyArea
 
       const response = await apiService.getSessionList(params)
-      const normalized = (response.data ?? []).map(normalizeSession)
-
-      // фронтенд fallback филтър по body area (работи и ако бекендът е филтрирал)
-      const filtered =
-        selectedBodyArea !== "all"
-          ? normalized.filter((s) => s.bodyArea === selectedBodyArea)
-          : normalized
-
-      setSessions(filtered)
-    } catch (error) {
+      const normalized: Session[] = (response.data ?? []).map(normalizeSession)
+      setRawSessions(normalized)
+    } catch {
       toast({
         title: "Грешка",
         description: "Неуспешно зареждане на сесиите",
@@ -100,16 +101,17 @@ export default function SessionsPage() {
     }
   }
 
+  // Фечваме при mount и когато се смени частта на тялото (търсенето е клиентско)
   useEffect(() => {
     fetchSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, selectedBodyArea])
+  }, [selectedBodyArea])
 
   const confirmDelete = (s: Session) => {
     setSessionToDelete(s)
     setDeleteDialogOpen(true)
   }
-  
+
   const handleConfirmDelete = async () => {
     if (!sessionToDelete) return
     try {
@@ -129,7 +131,6 @@ export default function SessionsPage() {
       setSessionToDelete(null)
     }
   }
-  
 
   const handleFormSuccess = () => {
     setShowForm(false)
@@ -137,17 +138,38 @@ export default function SessionsPage() {
     fetchSessions()
   }
 
+  // 🧠 Клиентско филтриране, за да работи търсенето независимо от бекенда
+  const filteredSessions = useMemo(() => {
+    let list = rawSessions
+
+    if (selectedBodyArea !== "all") {
+      list = list.filter((s) => (s.bodyArea ?? "").toLowerCase() === selectedBodyArea)
+    }
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
+      list = list.filter(
+        (s) =>
+          s.title?.toLowerCase?.().includes(q) ||
+          s.bodyArea?.toLowerCase?.().includes(q) ||
+          s.description?.toLowerCase?.().includes(q)
+      )
+    }
+
+    return list
+  }, [rawSessions, debouncedSearch, selectedBodyArea])
+
   return (
     <ProtectedRoute>
       <DashboardLayout>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Тренировки</h1>
-              <p className="text-muted-foreground">Управление на тренировки и упражнения</p>
+              <h1 className="text-3xl text-secondary font-bold">Тренировки</h1>
+              <p className="text-secondary">Управление на тренировки и упражнения</p>
             </div>
             {canManageSessions && (
-              <Button onClick={() => setShowForm(true)}>
+              <Button variant="white" onClick={() => setShowForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Нова тренировка
               </Button>
@@ -157,15 +179,15 @@ export default function SessionsPage() {
           {/* Филтри */}
           <div className="flex gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary h-4 w-4" />
               <Input
                 placeholder="Търси тренировка..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-1 border-gray-500"
               />
             </div>
-            <Select value={selectedBodyArea} onValueChange={(v) => setSelectedBodyArea(v)}>
+            <Select value={selectedBodyArea} onValueChange={setSelectedBodyArea}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Част от тялото" />
               </SelectTrigger>
@@ -179,6 +201,11 @@ export default function SessionsPage() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Опционално: брояч на резултата */}
+          {(debouncedSearch || selectedBodyArea !== "all") && !loading && (
+            <p className="text-sm text-secondary">Намерени: {filteredSessions.length}</p>
+          )}
 
           {/* Списък със сесии */}
           {loading ? (
@@ -198,15 +225,15 @@ export default function SessionsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sessions.map((session) => (
+              {filteredSessions.map((session) => (
                 <Card key={session.id} className="group hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
                         <CardTitle className="text-lg">{session.title}</CardTitle>
                         <CardDescription className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary">{getBodyAreaLabel(session.bodyArea)}</Badge>
-                          <div className="flex items-center text-sm text-muted-foreground">
+                          <Badge className="text-secondary bg-transparent border-1 border-gray-500" variant="secondary">{getBodyAreaLabel(session.bodyArea)}</Badge>
+                          <div className="flex items-center text-sm text-secondary">
                             <Clock className="h-3 w-3 mr-1" />
                             {session.durationMins} мин
                           </div>
@@ -225,21 +252,20 @@ export default function SessionsPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => confirmDelete(session)}>
-  <Trash2 className="h-4 w-4" />
-</Button>
-
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground line-clamp-3">
+                      <p className="text-sm text-secondary line-clamp-3">
                         {session.description || "Без описание"}
                       </p>
                       <div className="flex gap-2">
                         <Link href={`/sessions/${session.id}`}>
-                          <Button size="sm" variant="outline" className="flex-1 bg-transparent">
+                          <Button size="sm" variant="white" className="flex-1">
                             <Eye className="h-4 w-4 mr-2" />
                             Детайли
                           </Button>
@@ -252,15 +278,15 @@ export default function SessionsPage() {
             </div>
           )}
 
-          {!loading && sessions.length === 0 && (
+          {!loading && filteredSessions.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">Няма намерени тренировки</p>
+              <p className="text-secondary">Няма намерени тренировки</p>
             </div>
           )}
         </div>
 
         {/* Диалог за форма на сесия */}
-        {/* <Dialog
+        <Dialog
           open={showForm}
           onOpenChange={(open) => {
             setShowForm(open)
@@ -271,7 +297,9 @@ export default function SessionsPage() {
             <DialogHeader>
               <DialogTitle>{editingSession ? "Редактиране на сесия" : "Нова сесия"}</DialogTitle>
             </DialogHeader>
+
             <SessionForm
+              key={editingSession?.id ?? "new"}   // ⬅️ принудителен ремоунт при смяна
               session={editingSession}
               onSuccess={handleFormSuccess}
               onCancel={() => {
@@ -280,62 +308,36 @@ export default function SessionsPage() {
               }}
             />
           </DialogContent>
-        </Dialog> */}
-        <Dialog
-  open={showForm}
-  onOpenChange={(open) => {
-    setShowForm(open)
-    if (!open) setEditingSession(null)
-  }}
->
-  <DialogContent className="max-w-2xl">
-    <DialogHeader>
-      <DialogTitle>{editingSession ? "Редактиране на сесия" : "Нова сесия"}</DialogTitle>
-    </DialogHeader>
+        </Dialog>
 
-    <SessionForm
-      key={editingSession?.id ?? "new"}   // ⬅️ важно
-      session={editingSession}
-      onSuccess={handleFormSuccess}
-      onCancel={() => {
-        setShowForm(false)
-        setEditingSession(null)
-      }}
-    />
-  </DialogContent>
-</Dialog>
-
-
-<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-  <AlertDialogContent
-    onPointerDownCapture={(e) => e.stopPropagation()}
-    onKeyDownCapture={(e) => {
-      if ((e as React.KeyboardEvent).key === "Escape") e.stopPropagation()
-    }}
-  >
-    <AlertDialogHeader>
-      <AlertDialogTitle>Изтриване на сесия</AlertDialogTitle>
-      <AlertDialogDescription>
-        Сигурни ли сте, че искате да изтриете{" "}
-        <strong>{sessionToDelete?.title}</strong>? Това действие не може да бъде отменено.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel onClick={() => setSessionToDelete(null)}>
-        Отказ
-      </AlertDialogCancel>
-      <AlertDialogAction
-        onClick={handleConfirmDelete}
-        className="bg-destructive text-white hover:bg-destructive/90"
-        disabled={deleting}
-      >
-        {deleting ? "Изтриване..." : "Изтрий"}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-
-
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent
+            onPointerDownCapture={(e) => e.stopPropagation()}
+            onKeyDownCapture={(e) => {
+              if ((e as React.KeyboardEvent).key === "Escape") e.stopPropagation()
+            }}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Изтриване на сесия</AlertDialogTitle>
+              <AlertDialogDescription>
+                Сигурни ли сте, че искате да изтриете{" "}
+                <strong>{sessionToDelete?.title}</strong>? Това действие не може да бъде отменено.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSessionToDelete(null)}>
+                Отказ
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-destructive text-secondary hover:bg-destructive/90"
+                disabled={deleting}
+              >
+                {deleting ? "Изтриване..." : "Изтрий"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DashboardLayout>
     </ProtectedRoute>
   )

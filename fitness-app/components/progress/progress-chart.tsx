@@ -170,79 +170,82 @@ export function ProgressChart({ data, type }: ProgressChartProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>Проследяване на прогреса във времето</CardDescription>
-      </CardHeader>
-      <CardContent className="overflow-x-auto">
-        <ChartContainer
-          config={{
-            value: {
-              label: title,
-              color: color,
-            },
+  <CardHeader>
+    <CardTitle className="text-secondary">{title}</CardTitle> {/* Title white */}
+    <CardDescription>
+      Проследяване на прогреса във времето
+    </CardDescription> {/* Description white */}
+  </CardHeader>
+  <CardContent className="overflow-x-auto">
+    <ChartContainer
+      config={{
+        value: {
+          label: title,
+          color: "white",
+        },
+      }}
+      className="h-[220px] sm:h-[260px] md:h-[320px]"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+          data={chartData}
+          margin={{
+            top: 10,
+            right: 20,
+            left: 4,
+            bottom: isSmall ? 36 : 24,
           }}
-          className="h-[220px] sm:h-[260px] md:h-[320px]"
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{
-                top: 10,
-                right: 20,
-                left: 4,
-                bottom: isSmall ? 36 : 24,
-              }}
-            >
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: isSmall ? 10 : 12 }}
-                tickLine={false}
-                axisLine={false}
-                angle={isSmall ? -35 : 0}
-                textAnchor={isSmall ? "end" : "middle"}
-                height={isSmall ? 50 : 30}
-                interval="preserveStartEnd"
-                minTickGap={isSmall ? 8 : 16}
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: isSmall ? 10 : 12, fill: "white" }} // dates white
+            tickLine={false}
+            axisLine={false}
+            angle={isSmall ? -35 : 0}
+            textAnchor={isSmall ? "end" : "middle"}
+            height={isSmall ? 50 : 30}
+            interval="preserveStartEnd"
+            minTickGap={isSmall ? 8 : 16}
+          />
+          <YAxis
+            tick={{ fontSize: 12, fill: "white" }} // numbers white
+            tickFormatter={(v) => `${v}${unit === "%" ? "" : ""}`}
+            tickLine={false}
+            axisLine={false}
+            width={isSmall ? 28 : 36}
+            domain={["dataMin - 5", "dataMax + 5"]}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                formatter={(value) => [`${value} ${unit}`, title]}
+                labelFormatter={(label, payload) => {
+                  if (payload && payload[0]) {
+                    return new Date(payload[0].payload.fullDate).toLocaleDateString("bg-BG", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
+                  }
+                  return label
+                }}
               />
-              <YAxis
-                tick={{ fontSize: 12 }}
-                tickFormatter={(v) => `${v}${unit === "%" ? "" : ""}`}
-                tickLine={false}
-                axisLine={false}
-                width={isSmall ? 28 : 36}
-                domain={["dataMin - 5", "dataMax + 5"]}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value) => [`${value} ${unit}`, title]}
-                    labelFormatter={(label, payload) => {
-                      if (payload && payload[0]) {
-                        return new Date(payload[0].payload.fullDate).toLocaleDateString("bg-BG", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })
-                      }
-                      return label
-                    }}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={color}
-                strokeWidth={2}
-                dot={{ fill: color, strokeWidth: 2, r: isSmall ? 3 : 4 }}
-                activeDot={{ r: isSmall ? 5 : 6, stroke: color, strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartContainer>
-      </CardContent>
-    </Card>
+            }
+          />
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke="white"
+            strokeWidth={2}
+            dot={{ fill: "white", strokeWidth: 2, r: isSmall ? 3 : 4 }}
+            activeDot={{ r: isSmall ? 5 : 6, stroke: "white", strokeWidth: 2 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  </CardContent>
+</Card>
+
   )
 }
 

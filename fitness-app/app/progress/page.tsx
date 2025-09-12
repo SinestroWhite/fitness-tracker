@@ -76,10 +76,7 @@ export default function ProgressPage() {
     }
   }
 
-  useEffect(() => {
-    loadProgress()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
+
 
   const refreshEntry = async (progressId: string) => {
     const list = await loadProgress()
@@ -99,17 +96,33 @@ export default function ProgressPage() {
   // ========= CREATE / UPDATE HANDLERS =========
 
   // After creating a new progress (inline form)
-  const handleProgressAdded = (newProgress: ProgressWithImages) => {
-    loadProgress()
-    setProgressData((prev) => [newProgress, ...prev])
+  // const handleProgressAdded = (newProgress: ProgressWithImages) => {
+  //   loadProgress()
+  //   setProgressData((prev) => [newProgress, ...prev])
+  //   setShowForm(false)
+  // }
+  const handleProgressAdded = async (_newProgress: ProgressWithImages) => {
+    // Just reload from server; don't push locally
+    await loadProgress()
     setShowForm(false)
   }
+  
+  // After FULL submit while editing: refresh and auto-close
+  const handleProgressUpdated = async (_updatedProgress: ProgressWithImages) => {
+    await loadProgress()
+    setEditingEntry(null)
+  }
+
+  useEffect(() => {
+    loadProgress()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters])
 
   // After FULL submit while editing: refresh and AUTO-CLOSE the dialog
-  const handleProgressUpdated = async (updatedProgress: ProgressWithImages) => {
-    await loadProgress()
-    setEditingEntry(null) // ✅ auto-close the edit dialog on submit
-  }
+  // const handleProgressUpdated = async (updatedProgress: ProgressWithImages) => {
+  //   await loadProgress()
+  //   setEditingEntry(null) // ✅ auto-close the edit dialog on submit
+  // }
 
   // Edit
   const handleEditEntry = (entry: ProgressWithImages) => setEditingEntry(entry)
@@ -124,7 +137,6 @@ export default function ProgressPage() {
   const getPics = (p?: ProgressWithImages) => (p?.images ?? []) as string[]
 
   const latestWeight = progressData.length > 0 ? progressData[0].weightKg : null
-  const latestBodyFat = progressData.length > 0 ? progressData[0].bodyFat : null
 
   // Global gallery: flatten all images with metadata
   const galleryItems = useMemo(() => {
@@ -173,41 +185,27 @@ export default function ProgressPage() {
         {/* Header + Add button */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Прогрес</h1>
-            <p className="text-muted-foreground">Проследявайте вашия фитнес прогрес във времето</p>
+            <h1 className="text-3xl text-secondary font-bold">Прогрес</h1>
+            <p className="text-secondary">Проследявайте вашия фитнес прогрес във времето</p>
           </div>
-          <Button className="cursor-pointer" onClick={showForm ? () => setShowForm(false) : handleAddNew}>
+          <Button variant="white" className="cursor-pointer" onClick={showForm ? () => setShowForm(false) : handleAddNew}>
             <Plus className="mr-2 h-4 w-4" />
             {showForm ? "Скрий формата" : "Добави запис"}
           </Button>
         </div>
 
         {/* Current Stats */}
-        {(latestWeight || latestBodyFat) && (
+        {(latestWeight) && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {latestWeight && (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Текущо тегло</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <TrendingUp className="h-4 w-4 text-secondary" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{latestWeight} кг</div>
-                  <p className="text-xs text-muted-foreground">
-                    Последно обновено: {new Date(progressData[0].createdAt).toLocaleDateString("bg-BG")}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-            {latestBodyFat && (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Мастна тъкан</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{latestBodyFat}%</div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-secondary">
                     Последно обновено: {new Date(progressData[0].createdAt).toLocaleDateString("bg-BG")}
                   </p>
                 </CardContent>
@@ -236,7 +234,7 @@ export default function ProgressPage() {
           >
             <DialogHeader>
               <DialogTitle>Редакция на прогрес</DialogTitle>
-              <DialogDescription>Променете стойностите и управлявайте снимките за този запис.</DialogDescription>
+              <DialogDescription className="text-secondary">Променете стойностите и управлявайте снимките за този запис.</DialogDescription>
             </DialogHeader>
 
             {/* Form */}
@@ -245,6 +243,9 @@ export default function ProgressPage() {
               onSuccess={handleProgressUpdated}       // ✅ auto-close on submit
               onCancel={closeEdit}
               // ⬇️ NEW: when images get uploaded from within the form, refresh this entry
+              // onImagesUploaded={async () => {
+              //   if (editingEntry) await refreshEntry(editingEntry.id)
+              // }}
               onImagesUploaded={async () => {
                 if (editingEntry) await refreshEntry(editingEntry.id)
               }}
@@ -254,13 +255,13 @@ export default function ProgressPage() {
             {editingEntry && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  <span className="text-sm font-medium">Снимки към този запис</span>
-                  <span className="text-xs text-muted-foreground">({getPics(editingEntry).length})</span>
+                  <ImageIcon className="h-4 w-4 text-secondary" />
+                  <span className="text-sm font-medium text-secondary">Снимки към този запис</span>
+                  <span className="text-xs text-secondary">({getPics(editingEntry).length})</span>
                 </div>
 
                 {getPics(editingEntry).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Все още няма качени снимки към този запис.</p>
+                  <p className="text-sm text-secondary">Все още няма качени снимки към този запис.</p>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {getPics(editingEntry).map((url, idx) => (
@@ -288,9 +289,8 @@ export default function ProgressPage() {
 
         {/* Charts */}
         {progressData.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6">
             <ProgressChart data={progressData} type="weight" />
-            <ProgressChart data={progressData} type="bodyFat" />
           </div>
         )}
 
@@ -307,11 +307,11 @@ export default function ProgressPage() {
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="dateFrom">От дата</Label>
-                <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <Input id="dateFrom" className="border-1 border-gray-500" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dateTo">До дата</Label>
-                <Input id="dateTo" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                <Input id="dateTo" className="border-1 border-gray-500" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sort">Сортиране</Label>
@@ -328,7 +328,7 @@ export default function ProgressPage() {
                 </Select>
               </div>
               <div className="flex items-end">
-                <Button onClick={handleFilterChange} className="cursor-pointer w-full">
+                <Button variant="white" onClick={handleFilterChange} className="cursor-pointer w-full">
                   Приложи филтри
                 </Button>
               </div>
@@ -340,9 +340,9 @@ export default function ProgressPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ImageIcon className="h-4 w-4" /> Снимки
+              <ImageIcon className="h-4 w-4 text-secondary" /> Снимки
             </CardTitle>
-            <CardDescription>Кликнете, за да отворите визуализатора и да прелиствате или изтривате.</CardDescription>
+            <CardDescription >Кликнете, за да отворите визуализатора и да прелиствате или изтривате.</CardDescription>
           </CardHeader>
           <CardContent>
             {galleryItems.length === 0 ? (
@@ -363,7 +363,7 @@ export default function ProgressPage() {
                       className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                       onError={(e) => { e.currentTarget.src = "/placeholder.svg" }}
                     />
-                    <span className="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-white">
+                    <span className="absolute bottom-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/60 text-secondary">
                       {new Date(g.createdAt).toLocaleDateString("bg-BG")}
                     </span>
                   </button>

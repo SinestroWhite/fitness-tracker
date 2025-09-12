@@ -12,7 +12,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, requiredRole }: DashboardLayoutProps) {
   return (
     <ProtectedRoute requiredRole={requiredRole}>
-      <div className="flex h-screen bg-background">
+      <div className="flex bg-[url(/bg.jpg)] h-screen bg-cover overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">{children}</div>

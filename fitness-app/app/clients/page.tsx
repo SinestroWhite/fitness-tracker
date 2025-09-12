@@ -8,8 +8,8 @@ export default function ClientsPage() {
     <DashboardLayout requiredRole="trainer">
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Моите клиенти</h1>
-          <p className="text-muted-foreground">Управлявайте и проследявайте прогреса на вашите клиенти</p>
+          <h1 className="text-3xl text-secondary font-bold">Моите клиенти</h1>
+          <p className="text-secondary">Управлявайте и проследявайте прогреса на вашите клиенти</p>
         </div>
 
         <ClientList />

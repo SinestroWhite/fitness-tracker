@@ -432,7 +432,7 @@ export function WorkoutPlanner() {
             <Button onClick={saveWorkoutPlan} disabled={loading} className="w-full cursor-pointer mt-4">
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-secondary mr-2"></div>
                   Запазване...
                 </>
               ) : (

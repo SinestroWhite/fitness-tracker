@@ -8,7 +8,7 @@ const router = express.Router()
 // GET /nutrition-plans - List nutrition plans
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const { goal, authorId, search, include, page = 1, limit = 10 } = req.query
+    const { goal, authorId, search, include, page = 1, limit = 1000 } = req.query
     const offset = (page - 1) * limit
 
     let query = `
@@ -94,55 +94,280 @@ router.get("/", authenticateToken, async (req, res) => {
 })
 
 // GET /nutrition-plans/:id - Get nutrition plan by ID
+// router.get("/:id", authenticateToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
+//     const { include } = req.query
+//     console.log(id)
+
+//     let query = `
+//       SELECT np.*, u.name as author_name, u.email as author_email
+//       FROM nutrition_plans np
+//       LEFT JOIN users u ON np.author_id = u.id
+//       WHERE np.id = $1
+//     `
+//     const params = [id]
+
+//     // Authorization check
+//     if (req.user.role === "user") {
+//       query += ` AND np.author_id = $2`
+//       params.push(req.user.id)
+//     }
+
+//     const result = await db.query(query, params)
+
+//     if (result.rows.length === 0) {
+//       return res.status(404).json({ error: "Nutrition plan not found" })
+//     }
+
+//     const plan = result.rows[0]
+
+//     // Include related data if requested
+//     if (include) {
+//       const includes = include.split(",")
+
+//       if (includes.includes("meals")) {
+//         const mealsQuery = `
+//           SELECT npmp.*, m.title, m.image, m.description, m.calories, m.protein, m.carbohydrates, m.fat
+//           FROM nutrition_plan_meal_pivot npmp
+//           JOIN meals m ON npmp.meal_id = m.id
+//           WHERE npmp.nutrition_plan_id = $1
+//         `
+//         const mealsResult = await db.query(mealsQuery, [id])
+//         plan.meals = mealsResult.rows
+//       }
+//     }
+
+//     res.json(plan)
+//   } catch (error) {
+//     console.error("Error fetching nutrition plan:", error)
+//     res.status(500).json({ error: "Internal server error" })
+//   }
+// })
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params
-    const { include } = req.query
+    const { id } = req.params;
+    const { include } = req.query;
 
-    let query = `
-      SELECT np.*, u.name as author_name, u.email as author_email
-      FROM nutrition_plans np
-      LEFT JOIN users u ON np.author_id = u.id
-      WHERE np.id = $1
-    `
-    const params = [id]
+    const planResult = await db.query(
+      `SELECT np.*, u.name AS author_name, u.email AS author_email
+       FROM nutrition_plans np
+       LEFT JOIN users u ON np.author_id = u.id
+       WHERE np.id = $1`,
+      [id]
+    );
 
-    // Authorization check
-    if (req.user.role === "user") {
-      query += ` AND np.author_id = $2`
-      params.push(req.user.id)
+    if (planResult.rows.length === 0) {
+      return res.status(404).json({ error: "Nutrition plan not found" });
     }
 
-    const result = await db.query(query, params)
+    const plan = planResult.rows[0];
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Nutrition plan not found" })
-    }
+    // НЯМА авторизационна проверка тук – всички логнати имат достъп
 
-    const plan = result.rows[0]
-
-    // Include related data if requested
-    if (include) {
-      const includes = include.split(",")
-
+    if (typeof include === "string") {
+      const includes = include.split(",");
       if (includes.includes("meals")) {
-        const mealsQuery = `
-          SELECT npmp.*, m.title, m.image, m.description, m.calories, m.protein, m.carbohydrates, m.fat
-          FROM nutrition_plan_meal_pivot npmp
-          JOIN meals m ON npmp.meal_id = m.id
-          WHERE npmp.nutrition_plan_id = $1
-        `
-        const mealsResult = await db.query(mealsQuery, [id])
-        plan.meals = mealsResult.rows
+        const mealsResult = await db.query(
+          `SELECT npmp.*, m.title, m.image, m.description, m.calories, m.protein, m.carbohydrates, m.fat
+           FROM nutrition_plan_meal_pivot npmp
+           JOIN meals m ON npmp.meal_id = m.id
+           WHERE npmp.nutrition_plan_id = $1`,
+          [id]
+        );
+        plan.meals = mealsResult.rows;
       }
     }
 
-    res.json(plan)
+    return res.json(plan);
   } catch (error) {
-    console.error("Error fetching nutrition plan:", error)
-    res.status(500).json({ error: "Internal server error" })
+    console.error("Error fetching nutrition plan:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
-})
+});
+
+// routes/nutrition-plans.js
+// router.get("/:id/schedule", authenticateToken, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     // 1) Вземи самия план (без ограничения по author_id, щом всички логнати имат достъп)
+//     const planRes = await db.query(
+//       `SELECT np.*, u.name AS author_name, u.email AS author_email
+//        FROM nutrition_plans np
+//        LEFT JOIN users u ON np.author_id = u.id
+//        WHERE np.id = $1`,
+//       [id]
+//     );
+//     if (planRes.rows.length === 0) {
+//       return res.status(404).json({ error: "Nutrition plan not found" });
+//     }
+//     const nutritionPlan = planRes.rows[0];
+
+//     // 2) Вземи всички pivot-и + meal детайли за този план
+//     const rowsRes = await db.query(
+//       `SELECT 
+//          npmp.id,
+//          npmp.position,
+//          npmp.quantity,
+//          npmp.quantity_kg AS "quantityKg",
+//          COALESCE(npmp.schedule, '[]'::jsonb) AS schedule,
+//          m.id AS "mealId",
+//          m.title,
+//          m.image,
+//          m.description,
+//          m.calories::float  AS calories,
+//          m.protein::float   AS protein,
+//          m.carbohydrates::float AS carbohydrates,
+//          m.fat::float       AS fat
+//        FROM nutrition_plan_meal_pivot npmp
+//        JOIN meals m ON m.id = npmp.meal_id
+//        WHERE npmp.nutrition_plan_id = $1
+//        ORDER BY npmp.position ASC, npmp.id ASC`,
+//       [id]
+//     );
+
+//     // 3) Построй schedule обект: { Mon: [], Tue: [], ... }
+//     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+//     const schedule = Object.fromEntries(days.map((d) => [d, []]));
+
+//     for (const r of rowsRes.rows) {
+//       // pivot със вложен meal (camelCase за фронта)
+//       const pivot = {
+//         id: r.id,
+//         position: r.position,
+//         quantity: r.quantity,
+//         quantityKg: r.quantityKg,
+//         schedule: r.schedule, // масив [{ day: 'Mon', time: '08:00' }, ...]
+//         meal: {
+//           id: r.mealId,
+//           title: r.title,
+//           image: r.image,
+//           description: r.description,
+//           calories: r.calories,
+//           protein: r.protein,
+//           carbohydrates: r.carbohydrates,
+//           fat: r.fat,
+//         },
+//       };
+
+//       // добави ПООТДЕЛНО по ден (по веднъж на ден, дори да има няколко часа в същия ден)
+//       const uniqueDays = new Set((r.schedule || []).map((s) => s.day));
+//       for (const d of uniqueDays) {
+//         if (schedule[d]) schedule[d].push(pivot);
+//       }
+//     }
+
+//     return res.json({ nutritionPlan, schedule });
+//   } catch (error) {
+//     console.error("Error fetching nutrition schedule:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// });
+// GET /nutrition-plans/:id/schedule
+router.get("/:id/schedule", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const planRes = await db.query(
+      `SELECT np.*, u.name AS author_name, u.email AS author_email
+       FROM nutrition_plans np
+       LEFT JOIN users u ON u.id = np.author_id
+       WHERE np.id = $1`,
+      [id]
+    );
+    if (planRes.rows.length === 0) {
+      return res.status(404).json({ error: "Nutrition plan not found" });
+    }
+    const nutritionPlan = planRes.rows[0];
+
+    const rowsRes = await db.query(
+      `SELECT 
+         npmp.id,
+         npmp.position,
+         npmp.quantity,
+         npmp.quantity_kg AS "quantityKg",
+         COALESCE(npmp.schedule, '[]'::jsonb) AS schedule,
+         m.id AS "mealId",
+         m.title,
+         m.image,
+         m.description,
+         m.calories::float  AS calories,
+         m.protein::float   AS protein,
+         m.carbohydrates::float AS carbohydrates,
+         m.fat::float       AS fat
+       FROM nutrition_plan_meal_pivot npmp
+       JOIN meals m ON m.id = npmp.meal_id
+       WHERE npmp.nutrition_plan_id = $1
+       ORDER BY npmp.position ASC, npmp.id ASC`,
+      [id]
+    );
+
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const schedule = Object.fromEntries(days.map((d) => [d, []]));
+
+    const zero = () => ({ calories: 0, protein: 0, carbohydrates: 0, fat: 0 });
+    const byDay = Object.fromEntries(days.map((d) => [d, zero()]));
+    const week = zero();
+
+    const pushMacros = (acc, add) => {
+      acc.calories += add.calories;
+      acc.protein += add.protein;
+      acc.carbohydrates += add.carbohydrates;
+      acc.fat += add.fat;
+    };
+
+    for (const r of rowsRes.rows) {
+      const multiplier =
+        r.quantity != null ? Number(r.quantity) :
+        r.quantityKg != null ? Number(r.quantityKg) : 1;
+
+      const calc = {
+        calories: (r.calories || 0) * multiplier,
+        protein: (r.protein || 0) * multiplier,
+        carbohydrates: (r.carbohydrates || 0) * multiplier,
+        fat: (r.fat || 0) * multiplier,
+      };
+
+      const pivot = {
+        id: r.id,
+        position: r.position,
+        quantity: r.quantity,
+        quantityKg: r.quantityKg,
+        schedule: r.schedule, // [{day,time},...]
+        meal: {
+          id: r.mealId,
+          title: r.title,
+          image: r.image,
+          description: r.description,
+          calories: r.calories,
+          protein: r.protein,
+          carbohydrates: r.carbohydrates,
+          fat: r.fat,
+        },
+        // изчислени макроси според quantity/quantityKg
+        calc,
+      };
+
+      // включи pivot по ден (без дублиране на карта; часовете ще са баджове)
+      const uniqueDays = new Set((r.schedule || []).map((s) => s.day));
+      for (const d of uniqueDays) {
+        if (schedule[d]) {
+          schedule[d].push(pivot);
+          pushMacros(byDay[d], calc);
+        }
+      }
+      pushMacros(week, calc);
+    }
+
+    return res.json({ nutritionPlan, schedule, totals: { byDay, week } });
+  } catch (e) {
+    console.error("Error fetching nutrition schedule:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 
 // POST /nutrition-plans - Create nutrition plan
 router.post("/", authenticateToken, requireRole(["trainer", "admin"]), async (req, res) => {
@@ -259,51 +484,197 @@ router.get("/:id/meals", authenticateToken, async (req, res) => {
 })
 
 // POST /nutrition-plans/:id/meals - Add meal to nutrition plan
+
+// router.post("/:id/meals", authenticateToken, requireRole(["trainer", "admin"]), async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { mealId, quantity, quantityKg, schedule, position } = req.body;
+
+//     // 1) Валидации на входа
+//     if (!mealId) return res.status(400).json({ error: "mealId is required" });
+
+//     const hasQty = quantity !== undefined && quantity !== null;
+//     const hasQtyKg = quantityKg !== undefined && quantityKg !== null;
+//     if ((hasQty ? 1 : 0) + (hasQtyKg ? 1 : 0) !== 1) {
+//       return res.status(400).json({ error: "Provide exactly one of quantity or quantityKg" });
+//     }
+
+//     if (schedule !== undefined && !Array.isArray(schedule)) {
+//       return res.status(400).json({ error: "schedule must be an array of { day, time }" });
+//     }
+
+//     // 2) Проверка за план и достъп
+//     const planQuery =
+//       req.user.role === "admin"
+//         ? "SELECT id FROM nutrition_plans WHERE id = $1"
+//         : "SELECT id FROM nutrition_plans WHERE id = $1 AND author_id = $2";
+
+//     const planParams = req.user.role === "admin" ? [id] : [id, req.user.id];
+//     const planResult = await db.query(planQuery, planParams);
+//     if (planResult.rows.length === 0) {
+//       return res.status(404).json({ error: "Nutrition plan not found or access denied" });
+//     }
+
+//     // 3) Проверка за meal
+//     const mealResult = await db.query("SELECT id FROM meals WHERE id = $1", [mealId]);
+//     if (mealResult.rows.length === 0) {
+//       return res.status(404).json({ error: "Meal not found" });
+//     }
+
+//     await db.query("BEGIN");
+
+//     // 4) Определяне на position: или ползвай подаденото, или сметни MAX+1
+//     let finalPosition = position;
+//     if (finalPosition === undefined || finalPosition === null) {
+//       const { rows } = await db.query(
+//         `SELECT COALESCE(MAX(position), 0) + 1 AS next_pos
+//          FROM nutrition_plan_meal_pivot
+//          WHERE nutrition_plan_id = $1`,
+//         [id]
+//       );
+//       finalPosition = rows[0].next_pos;
+//     } else {
+//       if (!(Number.isInteger(finalPosition) && finalPosition > 0)) {
+//         await db.query("ROLLBACK");
+//         return res.status(400).json({ error: "position must be a positive integer" });
+//       }
+//     }
+
+//     // 5) INSERT (вече включва position)
+//     const insertSql = `
+//       INSERT INTO nutrition_plan_meal_pivot
+//         (nutrition_plan_id, meal_id, position, quantity, quantity_kg, schedule)
+//       VALUES ($1, $2, $3, $4, $5, $6)
+//       RETURNING *;
+//     `;
+
+//     const params = [
+//       id,
+//       mealId,
+//       finalPosition,
+//       hasQty ? quantity : null,
+//       hasQtyKg ? quantityKg : null,
+//       schedule !== undefined ? JSON.stringify(schedule) : null,
+//     ];
+
+//     const result = await db.query(insertSql, params);
+
+//     await db.query("COMMIT");
+//     return res.status(201).json(result.rows[0]);
+//   } catch (error) {
+//     await db.query("ROLLBACK");
+//     if (error.code === "23505") {
+//       // UNIQUE (nutrition_plan_id, meal_id, position)
+//       return res.status(409).json({ error: "This meal with this position already exists in the plan" });
+//     }
+//     console.error("Error adding meal to nutrition plan:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// });
+
 router.post("/:id/meals", authenticateToken, requireRole(["trainer", "admin"]), async (req, res) => {
   try {
-    const { id } = req.params
-    const { mealId, quantity, quantityKg, schedule } = req.body
+    const { id } = req.params;
+    const { mealId, quantity, quantityKg, schedule, position } = req.body;
 
-    // Validate required fields
-    if (!mealId) {
-      return res.status(400).json({ error: "mealId is required" })
+    // 1) Input validations
+    if (!mealId) return res.status(400).json({ error: "mealId is required" });
+
+    const hasQty = quantity !== undefined && quantity !== null && quantity !== "";
+    const hasQtyKg = quantityKg !== undefined && quantityKg !== null && quantityKg !== "";
+
+    // allow one OR both, but require at least one
+    if (!hasQty && !hasQtyKg) {
+      return res.status(400).json({ error: "Provide at least one of quantity or quantityKg" });
     }
 
-    // Check if nutrition plan exists and user has permission
+    // optional: numeric & positive checks (if provided)
+    const qtyVal = hasQty ? Number(quantity) : null;
+    const qtyKgVal = hasQtyKg ? Number(quantityKg) : null;
+
+    if (hasQty && (!Number.isFinite(qtyVal) || qtyVal <= 0)) {
+      return res.status(400).json({ error: "quantity must be a positive number" });
+    }
+    if (hasQtyKg && (!Number.isFinite(qtyKgVal) || qtyKgVal <= 0)) {
+      return res.status(400).json({ error: "quantityKg must be a positive number" });
+    }
+
+    if (schedule !== undefined && !Array.isArray(schedule)) {
+      return res.status(400).json({ error: "schedule must be an array of { day, time }" });
+    }
+
+    // 2) Check plan & access
     const planQuery =
       req.user.role === "admin"
         ? "SELECT id FROM nutrition_plans WHERE id = $1"
-        : "SELECT id FROM nutrition_plans WHERE id = $1 AND author_id = $2"
+        : "SELECT id FROM nutrition_plans WHERE id = $1 AND author_id = $2";
 
-    const planParams = req.user.role === "admin" ? [id] : [id, req.user.id]
-    const planResult = await db.query(planQuery, planParams)
-
+    const planParams = req.user.role === "admin" ? [id] : [id, req.user.id];
+    const planResult = await db.query(planQuery, planParams);
     if (planResult.rows.length === 0) {
-      return res.status(404).json({ error: "Nutrition plan not found or access denied" })
+      return res.status(404).json({ error: "Nutrition plan not found or access denied" });
     }
 
-    // Check if meal exists
-    const mealResult = await db.query("SELECT id FROM meals WHERE id = $1", [mealId])
+    // 3) Check meal exists
+    const mealResult = await db.query("SELECT id FROM meals WHERE id = $1", [mealId]);
     if (mealResult.rows.length === 0) {
-      return res.status(404).json({ error: "Meal not found" })
+      return res.status(404).json({ error: "Meal not found" });
     }
 
-    const query = `
-      INSERT INTO nutrition_plan_meal_pivot (nutrition_plan_id, meal_id, quantity, quantity_kg, schedule)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `
+    await db.query("BEGIN");
 
-    const result = await db.query(query, [id, mealId, quantity, quantityKg, JSON.stringify(schedule)])
-    res.status(201).json(result.rows[0])
+    // 4) Determine position (use provided or compute MAX+1)
+    let finalPosition = position;
+    if (finalPosition === undefined || finalPosition === null) {
+      const { rows } = await db.query(
+        `SELECT COALESCE(MAX(position), 0) + 1 AS next_pos
+         FROM nutrition_plan_meal_pivot
+         WHERE nutrition_plan_id = $1`,
+        [id]
+      );
+      finalPosition = rows[0].next_pos;
+    } else {
+      if (!(Number.isInteger(finalPosition) && finalPosition > 0)) {
+        await db.query("ROLLBACK");
+        return res.status(400).json({ error: "position must be a positive integer" });
+      }
+    }
+
+    // 5) INSERT (supports quantity, quantityKg, or both)
+    const insertSql = `
+      INSERT INTO nutrition_plan_meal_pivot
+        (nutrition_plan_id, meal_id, position, quantity, quantity_kg, schedule)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *;
+    `;
+
+    const params = [
+      id,
+      mealId,
+      finalPosition,
+      hasQty ? qtyVal : null,
+      hasQtyKg ? qtyKgVal : null,
+      schedule !== undefined ? JSON.stringify(schedule) : null,
+    ];
+
+    const result = await db.query(insertSql, params);
+
+    await db.query("COMMIT");
+    return res.status(201).json(result.rows[0]);
   } catch (error) {
+    await db.query("ROLLBACK");
     if (error.code === "23505") {
-      // Unique constraint violation
-      return res.status(409).json({ error: "Meal already added to this nutrition plan" })
+      // UNIQUE (nutrition_plan_id, meal_id, position)
+      return res.status(409).json({ error: "This meal with this position already exists in the plan" });
     }
-    console.error("Error adding meal to nutrition plan:", error)
-    res.status(500).json({ error: "Internal server error" })
+    console.error("Error adding meal to nutrition plan:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
-})
+});
+
+
+
+
+
 
 module.exports = router

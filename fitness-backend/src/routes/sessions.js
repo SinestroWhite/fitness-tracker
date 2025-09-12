@@ -7,7 +7,7 @@ const router = express.Router()
 // GET /sessions - List sessions with filters
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const { bodyArea, durationMin, durationMax, authorId, search, page = 1, limit = 10 } = req.query
+    const { bodyArea, durationMin, durationMax, authorId, search, page = 1, limit = 1000 } = req.query
     const offset = (page - 1) * limit
 
     let query = `
@@ -107,20 +107,76 @@ router.get("/", authenticateToken, async (req, res) => {
 })
 
 // GET /sessions/:id - Get session detail
+// router.get("/:id", authenticateToken, async (req, res) => {
+//   try {
+//     const { id } = req.params
+//     const { include } = req.query
+
+//     const sessionResult = await db.query(
+//       `
+//             SELECT s.*, u.name as author_name 
+//             FROM sessions s 
+//             LEFT JOIN users u ON s.author_id = u.id 
+//             WHERE s.id = $1
+//         `,
+//       [id],
+//     )
+
+//     if (sessionResult.rows.length === 0) {
+//       return res.status(404).json({ error: "Session not found" })
+//     }
+
+//     const session = sessionResult.rows[0]
+
+//     // Include exercises if requested
+//     if (include && include.includes("exercises")) {
+//       const exercisesResult = await db.query(
+//         `
+//                 SELECT e.*, se.repetitions, se.time, se.id as pivot_id
+//                 FROM exercises e
+//                 JOIN session_exercises se ON e.id = se.exercise_id
+//                 WHERE se.session_id = $1
+//                 ORDER BY e.name
+//             `,
+//         [id],
+//       )
+
+//       session.exercises = exercisesResult.rows
+//     }
+
+//     res.json(session)
+//   } catch (error) {
+//     res.status(500).json({ error: error.message })
+//   }
+// })
 router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
-    const { include } = req.query
+    const includeParam = req.query.include
+    const includeList = typeof includeParam === "string"
+      ? includeParam.split(",").map(s => s.trim()).filter(Boolean)
+      : Array.isArray(includeParam)
+      ? includeParam
+      : []
 
-    const sessionResult = await db.query(
-      `
-            SELECT s.*, u.name as author_name 
-            FROM sessions s 
-            LEFT JOIN users u ON s.author_id = u.id 
-            WHERE s.id = $1
-        `,
-      [id],
-    )
+    const qSession = `
+      SELECT
+        s.*,
+        u.name AS author_name,
+        COALESCE(
+          (
+            SELECT json_agg(wps.workout_plan_id ORDER BY wps.workout_plan_id)
+            FROM workout_plan_sessions wps
+            WHERE wps.session_id = s.id
+          ),
+          '[]'::json
+        ) AS workout_plan_ids
+      FROM sessions s
+      LEFT JOIN users u ON s.author_id = u.id
+      WHERE s.id = $1
+      LIMIT 1
+    `
+    const sessionResult = await db.query(qSession, [id])
 
     if (sessionResult.rows.length === 0) {
       return res.status(404).json({ error: "Session not found" })
@@ -129,26 +185,32 @@ router.get("/:id", authenticateToken, async (req, res) => {
     const session = sessionResult.rows[0]
 
     // Include exercises if requested
-    if (include && include.includes("exercises")) {
-      const exercisesResult = await db.query(
-        `
-                SELECT e.*, se.repetitions, se.time, se.id as pivot_id
-                FROM exercises e
-                JOIN session_exercises se ON e.id = se.exercise_id
-                WHERE se.session_id = $1
-                ORDER BY e.name
-            `,
-        [id],
-      )
-
+    if (includeList.includes("exercises")) {
+      const qExercises = `
+        SELECT
+          e.*,
+          se.repetitions,
+          se.time,
+          se.id AS pivot_id,
+          se.position
+        FROM session_exercises se
+        JOIN exercises e ON e.id = se.exercise_id
+        WHERE se.session_id = $1
+        ORDER BY
+          se.position NULLS LAST,
+          e.name
+      `
+      const exercisesResult = await db.query(qExercises, [id])
       session.exercises = exercisesResult.rows
     }
 
     res.json(session)
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    console.error("GET /sessions/:id error:", error)
+    res.status(500).json({ error: error.message || "Internal server error" })
   }
 })
+
 
 // POST /sessions - Create session (trainer or admin only)
 router.post("/", authenticateToken, requireRole(["trainer", "admin"]), validateSession, async (req, res) => {
