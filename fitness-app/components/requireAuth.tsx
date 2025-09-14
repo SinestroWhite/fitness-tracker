@@ -111,7 +111,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 
 const PUBLIC = ["/", "/login", "/register", "/forgot-password"];
-const NEAR_EXPIRY_MS = 5 * 60 * 1000; // 5 мин
+const NEAR_EXPIRY_MS = 1 * 60 * 1000; // 1 мин
 
 export default function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading, expiresAtMs, refreshUser, logout } = useAuth();
@@ -193,36 +193,36 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
   }, [expiresAtMs, isPublic, logout]);
 
   // 3) Soft-check при фокус/видимост около изтичане
-  const debounceRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (isPublic) return;
-
-    const doCheck = async () => {
-      if (!nearExpiry()) return;
-      await refreshUser();
-      if (!authOk()) {
-        goLogin("session-expired");
-      }
-    };
-
-    const schedule = () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      debounceRef.current = window.setTimeout(doCheck, 150);
-    };
-
-    const onFocus = () => schedule();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") schedule();
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    };
-  }, [isPublic, refreshUser, expiresAtMs, user]); // pathname/router не са нужни, използваме ги вътре в goLogin
+  // const debounceRef = useRef<number | null>(null);
+  // useEffect(() => {
+  //   if (isPublic) return;
+  //
+  //   const doCheck = async () => {
+  //     if (!nearExpiry()) return;
+  //     await refreshUser();
+  //     if (!authOk()) {
+  //       goLogin("session-expired");
+  //     }
+  //   };
+  //
+  //   const schedule = () => {
+  //     if (debounceRef.current) window.clearTimeout(debounceRef.current);
+  //     debounceRef.current = window.setTimeout(doCheck, 150);
+  //   };
+  //
+  //   const onFocus = () => schedule();
+  //   const onVisibility = () => {
+  //     if (document.visibilityState === "visible") schedule();
+  //   };
+  //
+  //   window.addEventListener("focus", onFocus);
+  //   document.addEventListener("visibilitychange", onVisibility);
+  //   return () => {
+  //     window.removeEventListener("focus", onFocus);
+  //     document.removeEventListener("visibilitychange", onVisibility);
+  //     if (debounceRef.current) window.clearTimeout(debounceRef.current);
+  //   };
+  // }, [isPublic, refreshUser, expiresAtMs, user]); // pathname/router не са нужни, използваме ги вътре в goLogin
 
   // Изчистен UI по време на пренасочване/bootstrapping
   if (!isPublic && !bootstrapped) return null;

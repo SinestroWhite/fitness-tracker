@@ -8,7 +8,7 @@ import { Suspense } from "react"
 import RequireAuth from "@/components/requireAuth"
 
 export const metadata: Metadata = {
-  title: "Фитнес Трекър",
+  title: "FitJourney",
   description: "Приложение за проследяване на фитнес прогрес",
   generator: "v0.app",
 }

@@ -332,7 +332,7 @@ export default function LoginPage() {
               {/* Logo */}
               <div className="flex items-center gap-2">
 
-                <span className="text-2xl font-bold text-secondary">Фитнес Тракър</span>
+                <span className="text-2xl font-bold text-secondary">FitJourney</span>
               </div>
 
 
@@ -453,6 +453,7 @@ export default function LoginPage() {
                       type="email"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
+                      className={"text-secondary"}
                       placeholder="example@email.com"
                       autoFocus
                     />

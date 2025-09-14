@@ -162,7 +162,7 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r-1 border-gray-500 bg-transperant backdrop-blur-md">
       <div className="flex h-16 items-center px-6 border-b-1 border-gray-500">
-        <h1 className="text-xl text-secondary font-bold">Фитнес Тракър</h1>
+        <h1 className="text-xl text-secondary font-bold">FitJourney</h1>
       </div>
 
       <div className="flex-1 px-4 py-6">

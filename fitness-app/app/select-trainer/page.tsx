@@ -123,11 +123,13 @@ const [alreadyReviewedTrainerName, setAlreadyReviewedTrainerName] = useState<str
   const loadTrainers = async () => {
     try {
       setLoading(true)
-      const response = await apiService.getTrainers({ pageSize: 100 })
+      let response = await apiService.getTrainers({ pageSize: 100 })
+      // response.data = response.data.filter((t) => !t.email.includes("trainer"))
   
       const trainersWithReviews = await Promise.all(
         response.data.map(async (trainer) => {
           try {
+            // Ауу много е зле
             // Взимаме 10 ревюта за страница (само за fallback), но основно ползваме stats
             const res = await apiService.getTrainerReviews(trainer.id, {
               page: 1,

@@ -390,7 +390,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
     // Ensure the pivot belongs to the workout plan
     const checkPivot = await db.query(
-      "SELECT 1 FROM workout_plan_sessions WHERE id = $1 AND workout_plan_id = $2",
+      "SELECT 1 FROM workout_plan_sessions WHERE session_id = $1 AND workout_plan_id = $2",
       [session_id, workout_plan_id]
     )
     if (checkPivot.rows.length === 0) {
@@ -636,7 +636,7 @@ router.get("/exercises/checklist", authenticateToken, async (req, res) => {
 
     // Validate pivot belongs to plan
     const chk = await db.query(
-      "SELECT session_id FROM workout_plan_sessions WHERE id = $1 AND workout_plan_id = $2",
+      "SELECT session_id FROM workout_plan_sessions WHERE session_id = $1 AND workout_plan_id = $2",
       [session_id, workout_plan_id]
     )
     if (chk.rows.length === 0) {
@@ -719,7 +719,7 @@ router.post("/exercises", authenticateToken, async (req, res) => {
 
     // Validate relationships
     const pivotOk = await db.query(
-      "SELECT 1 FROM workout_plan_sessions WHERE id = $1 AND workout_plan_id = $2",
+      "SELECT 1 FROM workout_plan_sessions WHERE session_id = $1 AND workout_plan_id = $2",
       [session_id, workout_plan_id]
     )
     if (pivotOk.rows.length === 0) {
@@ -802,7 +802,7 @@ router.post("/exercises/bulk", authenticateToken, async (req, res) => {
 
     // Validate pivot belongs to plan
     const pivotOk = await db.query(
-      "SELECT 1 FROM workout_plan_sessions WHERE id = $1 AND workout_plan_id = $2",
+      "SELECT 1 FROM workout_plan_sessions WHERE session_id = $1 AND workout_plan_id = $2",
       [session_id, workout_plan_id]
     )
     if (pivotOk.rows.length === 0) {

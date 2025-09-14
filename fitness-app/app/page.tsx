@@ -35,7 +35,7 @@
 //     <div className="min-h-screen flex items-center justify-center bg-background p-4">
 //       <Card className="w-full max-w-md text-center">
 //         <CardHeader className="space-y-4">
-//           <CardTitle className="text-3xl font-bold">Фитнес Трекър</CardTitle>
+//           <CardTitle className="text-3xl font-bold">FitJourney</CardTitle>
 //           <CardDescription className="text-lg">
 //             Проследявайте своя фитнес прогрес и постигайте целите си
 //           </CardDescription>
@@ -99,7 +99,7 @@ export default function HomePage() {
               {/* Logo */}
               <div className="flex items-center gap-2">
 
-                <span className="text-2xl font-bold text-secondary">Фитнес Тракър</span>
+                <span className="text-2xl font-bold text-secondary">FitJourney</span>
               </div>
 
 
