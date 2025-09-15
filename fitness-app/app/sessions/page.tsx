@@ -184,7 +184,7 @@ export default function SessionsPage() {
                 placeholder="Търси тренировка..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-1 border-gray-500"
+                className="pl-10 border-1 border-gray-500 text-secondary"
               />
             </div>
             <Select value={selectedBodyArea} onValueChange={setSelectedBodyArea}>

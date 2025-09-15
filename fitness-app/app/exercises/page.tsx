@@ -192,7 +192,7 @@ export default function ExercisesPage() {
                 placeholder="Търси упражнения..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-1 border-gray-500"
+                className="pl-10 border-1 border-gray-500 text-secondary"
               />
             </div>
             <Select value={selectedMuscle} onValueChange={setSelectedMuscle}>
