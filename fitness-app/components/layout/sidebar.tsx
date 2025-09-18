@@ -74,7 +74,7 @@ const navigation = [
     name: "Калкулатор",
     href: "/calculator",
     icon: Calculator,
-    roles: ["user", "trainer"],
+    roles: ["user", "trainer", "admin"],
   },
   {
     name: "Моите ревюта",
