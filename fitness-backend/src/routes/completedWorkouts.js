@@ -646,37 +646,16 @@ router.get("/exercises/checklist", authenticateToken, async (req, res) => {
 
     // Pull prescribed + left join completions
     const q = `
-      SELECT
-        wps.id AS workout_plan_session_id,
-        wps.workout_plan_id,
-        se.id  AS session_exercise_id,
-        se.session_id,
-        se.exercise_id,
-        se.occurrence,
-        se.position,
-        se.repetitions AS reps_prescribed,
-        se.time        AS time_prescribed,
-        e.name         AS exercise_name,
-        e.image        AS exercise_image,
-        e.video        AS exercise_video,
-        c.id           AS completion_id,
-        c.completed,
-        c.reps_done,
-        c.time_done,
-        c.weight_kg,
-        c.distance_m,
-        c.notes
-      FROM workout_plan_sessions wps
-      JOIN session_exercises se ON se.session_id = wps.session_id
-      JOIN exercises e          ON e.id = se.exercise_id
-      LEFT JOIN completed_user_session_exercises c
-        ON c.user_id                 = $1
-       AND c.workout_plan_id         = wps.workout_plan_id
-       AND c.workout_plan_session_id = wps.id
-       AND c.session_exercise_id     = se.id
-       AND c.performed_on            = $4::date
-      WHERE wps.id = $2 AND wps.workout_plan_id = $3
-      ORDER BY se.position NULLS LAST, se.occurrence, se.id
+     SELECT
+        se.id AS session_exercise_id,
+        c.completed
+      FROM session_exercises AS se
+      JOIN completed_user_session_exercises AS c 
+        ON se.id = c.session_exercise_id AND
+           c.user_id = $1                AND 
+           c.workout_plan_id = $3        AND 
+           se.session_id = $2            AND 
+           c.performed_on = $4::date
     `
     const r = await db.query(q, [userId, session_id, workout_plan_id, performed_on])
 
