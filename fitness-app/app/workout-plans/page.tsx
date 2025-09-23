@@ -118,7 +118,7 @@ export default function WorkoutPlansPage() {
 
   // Фечваме при mount и когато се смени целта (търсенето е клиентско)
   useEffect(() => {
-    fetchWorkoutPlans()
+    // fetchWorkoutPlans()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGoal])
 
